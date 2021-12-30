@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -73,6 +74,8 @@ public class HammerProcessor extends BaseProcessor {
     private Map<String, GenomeUniSequences> genomeSequences;
     /** number of hammers found */
     private long hammerCount;
+    /** number of genomes completed */
+    private int genomeCount;
 
     // COMMAND-LINE OPTIONS
 
@@ -130,6 +133,7 @@ public class HammerProcessor extends BaseProcessor {
         }
         // Denote no hammers have been found yet.
         this.hammerCount = 0;
+        this.genomeCount = 0;
         return true;
     }
 
@@ -137,17 +141,27 @@ public class HammerProcessor extends BaseProcessor {
     protected void runCommand() throws Exception {
         // We do most of the work in subroutines so that memory is managed more efficiently.
         // First, we build the genome sequences.  This part uses the genome source and the role map.
+        long start = System.currentTimeMillis();
         this.genomeSequences = this.buildGenomeDescriptorMap();
+        if (log.isInfoEnabled()) {
+            Duration length = Duration.ofMillis(System.currentTimeMillis() - start);
+            log.info("{} to build genome sequence map.", length.toString());
+        }
         // Now, we check the output file to build a list of the descriptors to process.  This part
         // uses the set of genomes already in the output file.
         Collection<GenomeUniSequences> genomes = this.selectGenomes();
         log.info("{} genomes remaining to process.", genomes.size());
         // Finally, we open the output file and process the genomes in parallel.  A synchronized
         // subroutine is used to write the output.
+        start = System.currentTimeMillis();
+        int startingGenomes = this.genomeCount;
         try (PrintWriter writer = this.getOutputStream()) {
             genomes.parallelStream().forEach(x -> this.findHammers(x, writer));
         }
-        log.info("{} total hammers found in {} genomes.", this.hammerCount, this.genomeSequences.size());
+        if (log.isInfoEnabled()) {
+            double rate = (System.currentTimeMillis() - start) / (1000.0 * (this.genomeCount - startingGenomes));
+            log.info("{} total hammers found in {} genomes at {} seconds/genome", this.hammerCount, this.genomeCount, rate);
+        }
     }
 
     /**
@@ -187,6 +201,7 @@ public class HammerProcessor extends BaseProcessor {
             // No.  Return the whole set.
             retVal = this.genomeSequences.values();
             log.info("New output file.  All genomes will be processed.");
+            this.genomeCount = 0;
         } else {
             // Here we must scan the old output file for already-processed genomes.
             Set<String> oldGenomes = new TreeSet<String>();
@@ -201,6 +216,7 @@ public class HammerProcessor extends BaseProcessor {
                 }
             }
             log.info("{} genomes already found in output file.", oldGenomes.size());
+            this.genomeCount = oldGenomes.size();
             // Form a set of universal-protein DNA sequence maps exclusing the old genomes.
             retVal = this.genomeSequences.values().stream()
                     .filter(x -> ! oldGenomes.contains(x.getGenomeId()))
@@ -265,6 +281,7 @@ public class HammerProcessor extends BaseProcessor {
         // that there are two real hammers for every hammer sequence.
         int retVal = kmerMap.size() * 2;
         this.hammerCount += retVal;
+        this.genomeCount++;
         // Write the hammers.  We flush at the end because we want all the hammers for a genome
         // to be output together, insuring the restart works properly.
         for (Map.Entry<String, String> kmerEntry : kmerMap.entrySet()) {
@@ -274,6 +291,7 @@ public class HammerProcessor extends BaseProcessor {
             writer.println(Contig.reverse(seq) + "\t" + fid);
         }
         writer.flush();
+        log.info("{} genomes processed.", this.genomeCount);
         return retVal;
     }
 
