@@ -1,5 +1,6 @@
 package org.theseed.genome;
 
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,19 @@ public class GenomeUniSeqTest {
     /** logging facility */
     protected static Logger log = LoggerFactory.getLogger(GenomeUniSeqTest.class);
 
+    @Test
+    public void testBadChars() throws IOException {
+        GenomeUniSequences.setKmerSize(KMER_SIZE);
+        File gtoFile = new File("data", "28181.21.gto");
+        RoleMap roles = RoleMap.load(new File("data", "roles.for.hammers"));
+        Genome genome = new Genome(gtoFile);
+        GenomeUniSequences seqs = new GenomeUniSequences(genome, roles);
+        var kmerMap = seqs.getKmerMap();
+        for (String kmer : kmerMap.keySet()) {
+            int bad = StringUtils.indexOfAnyBut(kmer, "acgt");
+            assertThat(kmer, bad, lessThan(0));
+        }
+    }
 
     @Test
     public void testSimple() throws IOException {
@@ -52,7 +66,7 @@ public class GenomeUniSeqTest {
             String seq = seqEntry.getValue();
             String fid = seqEntry.getKey();
             final int n = seq.length() - KMER_SIZE;
-            for (int i = 0; i < n; i++) {
+            for (int i = 0; i <= n; i++) {
                 String kmer = seq.substring(i, i+KMER_SIZE);
                 assertThat(kmer, kmerMap.get(kmer), equalTo(fid));
             }
@@ -67,7 +81,7 @@ public class GenomeUniSeqTest {
         // Verify we removed the kmers.
         for (String seq : seqs2.getSequenceMap().values()) {
             final int n = seq.length() - KMER_SIZE;
-            for (int i = 0; i < n; i++) {
+            for (int i = 0; i <= n; i++) {
                 var kmer1 = seq.substring(i, i+KMER_SIZE);
                 assertThat(kmer1, not(in(kmersLeft)));
                 assertThat(Contig.reverse(kmer1), not(in(kmersLeft)));

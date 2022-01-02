@@ -76,6 +76,10 @@ public class HammerProcessor extends BaseProcessor {
     private long hammerCount;
     /** number of genomes completed */
     private int genomeCount;
+    /** start time of genome run */
+    private long start;
+    /** number of genomes processed during this run */
+    private int newGenomeCount;
 
     // COMMAND-LINE OPTIONS
 
@@ -92,15 +96,17 @@ public class HammerProcessor extends BaseProcessor {
     private GenomeSource.Type sourceType;
 
     /** role definition file name */
-    @Argument(index = 0, metaVar = "role.definitions", usage = "name of file containing the definitions for the roles of interest")
+    @Argument(index = 0, metaVar = "role.definitions",
+            usage = "name of file containing the definitions for the roles of interest", required = true)
     private File roleFile;
 
     /** genome input source */
-    @Argument(index = 1, metaVar = "genomeDir", usage = "name of file or directory containing source genomes")
+    @Argument(index = 1, metaVar = "genomeDir", usage = "name of file or directory containing source genomes",
+            required = true)
     private File genomeDir;
 
     /** output file */
-    @Argument(index = 2, metaVar = "outFile", usage = "output file name")
+    @Argument(index = 2, metaVar = "outFile", usage = "output file name", required = true)
     private File outFile;
 
     @Override
@@ -141,10 +147,10 @@ public class HammerProcessor extends BaseProcessor {
     protected void runCommand() throws Exception {
         // We do most of the work in subroutines so that memory is managed more efficiently.
         // First, we build the genome sequences.  This part uses the genome source and the role map.
-        long start = System.currentTimeMillis();
+        this.start = System.currentTimeMillis();
         this.genomeSequences = this.buildGenomeDescriptorMap();
         if (log.isInfoEnabled()) {
-            Duration length = Duration.ofMillis(System.currentTimeMillis() - start);
+            Duration length = Duration.ofMillis(System.currentTimeMillis() - this.start);
             log.info("{} to build genome sequence map.", length.toString());
         }
         // Now, we check the output file to build a list of the descriptors to process.  This part
@@ -153,15 +159,13 @@ public class HammerProcessor extends BaseProcessor {
         log.info("{} genomes remaining to process.", genomes.size());
         // Finally, we open the output file and process the genomes in parallel.  A synchronized
         // subroutine is used to write the output.
-        start = System.currentTimeMillis();
-        int startingGenomes = this.genomeCount;
+        this.start = System.currentTimeMillis();
+        this.newGenomeCount = 0;
         try (PrintWriter writer = this.getOutputStream()) {
             genomes.parallelStream().forEach(x -> this.findHammers(x, writer));
         }
-        if (log.isInfoEnabled()) {
-            double rate = (System.currentTimeMillis() - start) / (1000.0 * (this.genomeCount - startingGenomes));
-            log.info("{} total hammers found in {} genomes at {} seconds/genome", this.hammerCount, this.genomeCount, rate);
-        }
+        if (log.isInfoEnabled())
+            log.info("{} total hammers found in {} genomes.", this.hammerCount, this.genomeCount);
     }
 
     /**
@@ -279,19 +283,29 @@ public class HammerProcessor extends BaseProcessor {
     private synchronized int writeHammers(Map<String, String> kmerMap, PrintWriter writer) {
         // Update the hammer count.  It is safe to do here because we are synchronized.  Note
         // that there are two real hammers for every hammer sequence.
-        int retVal = kmerMap.size() * 2;
-        this.hammerCount += retVal;
+        int retVal = kmerMap.size();
         this.genomeCount++;
+        this.newGenomeCount++;
         // Write the hammers.  We flush at the end because we want all the hammers for a genome
         // to be output together, insuring the restart works properly.
         for (Map.Entry<String, String> kmerEntry : kmerMap.entrySet()) {
             String fid = kmerEntry.getValue();
             String seq = kmerEntry.getKey();
             writer.println(seq + "\t" + fid);
-            writer.println(Contig.reverse(seq) + "\t" + fid);
+            String seq2 = Contig.reverse(seq);
+            // Insure the reverse complement is not already in the map.
+            if (! kmerMap.containsKey(seq2)) {
+                writer.println(seq2 + "\t" + fid);
+                retVal++;
+            }
         }
         writer.flush();
-        log.info("{} genomes processed.", this.genomeCount);
+        this.hammerCount += retVal;
+        if (log.isInfoEnabled()) {
+            double rate = (System.currentTimeMillis() - this.start) / (1000.0 * (this.newGenomeCount));
+            log.info("{} genomes processed with {} total hammers, {} seconds/genome.", this.genomeCount, this.hammerCount,
+                    rate);
+        }
         return retVal;
     }
 

@@ -4,6 +4,7 @@
 package org.theseed.genome;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -77,10 +78,12 @@ public class GenomeUniSequences implements Comparable<GenomeUniSequences> {
         var retVal = new HashMap<String, String>(hashLen);
         for (Map.Entry<String, String> seqEntry : this.sequenceMap.entrySet()) {
             String fid = seqEntry.getKey();
-            String seq = seqEntry.getValue();
-            final int n = seq.length() - kmerSize;
-            for (int i = 0; i < n; i++)
-                retVal.put(seq.substring(i, i+kmerSize), fid);
+            List<String> parts = Contig.cleanParts(seqEntry.getValue());
+            for (String seq : parts) {
+                final int n = seq.length() - kmerSize;
+                for (int i = 0; i <= n; i++)
+                    retVal.put(seq.substring(i, i+kmerSize), fid);
+            }
         }
         return retVal;
     }
@@ -109,8 +112,8 @@ public class GenomeUniSequences implements Comparable<GenomeUniSequences> {
      * @param seq		DNA sequence to scan
      */
     private void processSeqKmers(Map<String, String> kmerMap, String seq) {
-        final int n = seq.length() - kmerSize;
-        for (int i = 0; i < n; i++)
+        int n = seq.length() - kmerSize;
+        for (int i = 0; i <= n; i++)
             kmerMap.remove(seq.substring(i, i + kmerSize));
     }
 

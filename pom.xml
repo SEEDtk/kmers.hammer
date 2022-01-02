@@ -65,6 +65,11 @@
         <artifactId>p3api</artifactId>
         <version>0.0.1</version>
     </dependency>
+    <dependency>
+        <groupId>org.theseed</groupId>
+        <artifactId>java.erdb</artifactId>
+        <version>1.0.0</version>
+    </dependency>
         <!-- Testing dependencies-->
     <dependency>
       <groupId>org.hamcrest</groupId>

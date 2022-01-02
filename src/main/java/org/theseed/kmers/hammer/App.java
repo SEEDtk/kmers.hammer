@@ -8,6 +8,9 @@ import org.theseed.utils.BaseProcessor;
  * This program processes DNA hammers.  The commands are as follows.
  *
  *  hammers		find all the hammers for a specified set of genomes
+ *  closest		compute the closest genomes using the hammers
+ *  define		create a hammer definition file from a roles.in.subsystems file
+ *  dbLoad		load a hammer database from a flat file
  */
 public class App
 {
@@ -20,6 +23,15 @@ public class App
         switch (command) {
         case "hammers" :
             processor = new HammerProcessor();
+            break;
+        case "closest" :
+            processor = new FindClosestProcessor();
+            break;
+        case "define" :
+            processor = new HammerDefineProcessor();
+            break;
+        case "dbLoad" :
+            processor = new HammerDbLoadProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");
