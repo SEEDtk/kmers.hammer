@@ -103,7 +103,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     private String dbParms;
 
     /** input directory name */
-    @Argument(index = 1, metaVar = "inDir", usage = "input directory containing sequence files", required = true)
+    @Argument(index = 0, metaVar = "inDir", usage = "input directory containing sequence files", required = true)
     private File inDir;
 
     @Override
@@ -113,7 +113,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         this.dbFile = null;
         this.dbUrl = null;
         this.dbParms = null;
-        this.batchSize = 50;
+        this.batchSize = 4000;
     }
 
     @Override
@@ -142,7 +142,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         // Initialize the member counter.
         this.memberCount = 0;
         // Process all the members.
-        Stream<SequenceDirectory.Member> inStream = this.members.parallelStream();
+        Stream<SequenceDirectory.Member> inStream = this.members.stream();
         long start = System.currentTimeMillis();
         inStream.forEach(x -> this.analyzeMember(x, writer));
         if (log.isInfoEnabled() && this.memberCount > 0) {

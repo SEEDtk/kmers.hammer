@@ -5,6 +5,7 @@ package org.theseed.proteins.hammer;
 
 import java.io.File;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -63,6 +64,22 @@ public class SqlHammerDb extends HammerDb {
      */
     protected void init() {
         this.hashSize = this.batchSize * 4 / 3 + 1;
+        // We need to compute the kmer size.  Get one kmer.
+        SqlBuffer sizeQuery = new SqlBuffer(this.db).append("SELECT ").quote("Hammer", "hammer")
+                .append(" FROM ").quote("Hammer").append(" LIMIT 1");
+        try (PreparedStatement stmt = this.db.createStatement(sizeQuery)) {
+            ResultSet results = stmt.executeQuery();
+            if (! results.next())
+                throw new RuntimeException("No hammers found in hammer database.");
+            else {
+                String hammer = results.getString(1);
+                final int kSize = hammer.length();
+                this.setKmerSize(kSize);
+                log.info("Kmer size is {}.", kSize);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("SQL error computing kmer size: " + e.toString());
+        }
     }
 
     protected class Loader implements HammerDb.ILoader {
@@ -132,6 +149,7 @@ public class SqlHammerDb extends HammerDb {
         try {
             // Get an iterator for the kmers.
             Iterable<String> kIter = KmerSeries.init(seqs, kSize);
+            log.debug("Iterating through {} sequences.", seqs.size());
             // This will hold the current kmer batch.
             Set<String> kmers = new HashSet<String>(this.hashSize);
             // Create a query.
@@ -179,8 +197,12 @@ public class SqlHammerDb extends HammerDb {
             query.setParm(idx, kmer);
             idx++;
         }
-        for (DbRecord result : query)
+        int count = 0;
+        for (DbRecord result : query) {
             gCounts.count(result.getString("Hammer.genome_id"));
+            count++;
+        }
+        log.debug("{} kmers queried and {} results found.", idx-1, count);
     }
 
 }
