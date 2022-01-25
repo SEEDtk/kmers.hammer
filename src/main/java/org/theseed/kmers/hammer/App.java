@@ -11,6 +11,7 @@ import org.theseed.utils.BaseProcessor;
  *  closest		compute the closest genomes using the hammers
  *  define		create a hammer definition file from a roles.in.subsystems file
  *  dbLoad		load a hammer database from a flat file
+ *  binTest		separate contigs into bins using
  */
 public class App
 {
@@ -32,6 +33,9 @@ public class App
             break;
         case "dbLoad" :
             processor = new HammerDbLoadProcessor();
+            break;
+        case "binTest" :
+            processor = new BinTestProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

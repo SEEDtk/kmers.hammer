@@ -54,6 +54,11 @@
         <artifactId>shared</artifactId>
         <version>1.0.0</version>
     </dependency>
+    <dependency>
+        <groupId>org.theseed</groupId>
+        <artifactId>sequence</artifactId>
+        <version>1.0.0</version>
+    </dependency>
     <!-- https://mvnrepository.com/artifact/net.sf.trove4j/trove4j -->
     <dependency>
         <groupId>org.apache.commons</groupId>
