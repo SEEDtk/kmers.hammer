@@ -11,7 +11,7 @@ import org.theseed.utils.BaseProcessor;
  *  closest		compute the closest genomes using the hammers
  *  define		create a hammer definition file from a roles.in.subsystems file
  *  dbLoad		load a hammer database from a flat file
- *  binTest		separate contigs into bins using
+ *  binTest		separate contigs into bins using hammers
  */
 public class App
 {
