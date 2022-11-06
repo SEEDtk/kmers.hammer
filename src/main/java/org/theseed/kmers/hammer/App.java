@@ -9,6 +9,7 @@ import org.theseed.utils.BaseProcessor;
  *
  *  hammers		find all the hammers for a specified set of genomes
  *  closest		compute the closest genomes using the hammers
+ *  contigs		create a FASTA file for a hammer processor from a genome directory
  *  define		create a hammer definition file from a roles.in.subsystems file
  *  dbLoad		load a hammer database from a flat file
  *  binTest		separate contigs into bins using hammers
@@ -30,6 +31,9 @@ public class App
             break;
         case "define" :
             processor = new HammerDefineProcessor();
+            break;
+        case "contigs" :
+            processor = new HammerFastaProcessor();
             break;
         case "dbLoad" :
             processor = new HammerDbLoadProcessor();

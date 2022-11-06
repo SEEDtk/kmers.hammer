@@ -12,6 +12,8 @@ import java.util.stream.Collectors;
 import org.theseed.sequence.Sequence;
 
 /**
+ * This is an iterable for retrieving all the kmers in a sequence.
+ *
  * @author Bruce Parrello
  *
  */
