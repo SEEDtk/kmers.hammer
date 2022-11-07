@@ -31,12 +31,12 @@ class HammerFactoryTest {
         File gFile = new File("data", "1002870.3.gto");
         DnaKmers.setKmerSize(20);
         Genome genome = new Genome(gFile);
-        File rFile = new File("data", "roles.for.hammers2");
+        File rFile = new File("data", "roles.for.hammers");
         RoleMap roleMap = RoleMap.load(rFile);
         GenomeHammerFactory factory = new GenomeHammerFactory(genome, roleMap);
         // Verify the hammers.
         for (Feature feat : genome.getPegs()) {
-            if (feat.getUsefulRoles(roleMap).size() > 0) {
+            if (feat.isInteresting(roleMap)) {
                 final String fid = feat.getId();
                 log.info("Checking kmers for {}.", fid);
                 var kmerStream = new SequenceKmerIterable(genome.getDna(fid), 20);

@@ -49,7 +49,7 @@ public class GenomeUniSequences implements Comparable<GenomeUniSequences> {
         this.seqLen = 0;
         // Loop through the pegs, searching for roles of interest.
         for (Feature feat : genome.getPegs()) {
-            if (feat.getUsefulRoles(roleMap).size() > 0) {
+            if (feat.isInteresting(roleMap)) {
                 Location loc = feat.getLocation();
                 this.sequenceMap.put(feat.getId(), genome.getDna(loc));
                 this.seqLen += loc.getLength();

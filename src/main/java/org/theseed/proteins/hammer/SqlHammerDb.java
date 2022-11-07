@@ -70,7 +70,7 @@ public class SqlHammerDb extends HammerDb {
         try (PreparedStatement stmt = this.db.createStatement(sizeQuery)) {
             ResultSet results = stmt.executeQuery();
             if (! results.next())
-                throw new RuntimeException("No hammers found in hammer database.");
+                log.warn("No hammers found in hammer database.");
             else {
                 String hammer = results.getString(1);
                 final int kSize = hammer.length();

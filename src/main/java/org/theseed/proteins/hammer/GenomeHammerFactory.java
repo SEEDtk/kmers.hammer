@@ -64,7 +64,7 @@ public class GenomeHammerFactory {
         // Loop through the genome, checking the pegs.
         int usefulCount = 0;
         for (Feature feat : genome.getPegs()) {
-            if (feat.getUsefulRoles(roles).size() > 0) {
+            if (feat.isInteresting(roles)) {
                 usefulCount++;
                 // Here we have a feature of interest.  Extract its kmers in each direction.
                 String fid = feat.getId();
