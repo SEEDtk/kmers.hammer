@@ -7,6 +7,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
+import java.time.Duration;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -14,12 +17,14 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.RoleMap;
 import org.theseed.proteins.hammer.GenomeHammerFactory;
 import org.theseed.sequence.DnaKmers;
+import org.theseed.sequence.SequenceManager;
 import org.theseed.utils.BaseReportProcessor;
 import org.theseed.utils.ParseFailureException;
 
@@ -44,6 +49,10 @@ import org.theseed.utils.ParseFailureException;
  * The positional parameters are the name (file or directory) of the genome source, the name of the
  * contig FASTA file, and the name of the role definition file.
  *
+ * This is a long, slow command.  If an error or interruption occurs, you can resume processing by
+ * specifying the output of a previous run using the "--resume" option.  In that case, the
+ * previous file's hammers will be copied, and the genomes that were output will be skipped.
+ *
  * The command-line options are as follows.
  *
  * -h	display command-line usage
@@ -54,7 +63,9 @@ import org.theseed.utils.ParseFailureException;
  * --source		genome source type (master, core, PATRIC, etc.); default is DIR
  * --filter		name of a filter file; if specified, must be a tab-delimited file with headers containing
  * 				genome IDs in the first column, and only the specified genomes will be processed
- * --para		if specified, parallel processing will be used wherever possible
+ * --para		if specified, parallel processing will be used to improve throughput
+ * --resume		if specified, the name of the output file from a previous, interrupted run
+ * --method		method for accessing the contigs (FILE to read during processing, MEM to keep in memory, default FILE)
  *
  * @author Bruce Parrello
  *
@@ -70,6 +81,18 @@ public class HammerProcessor extends BaseReportProcessor {
     private TreeSet<String> genomeIdSet;
     /** role definition map for hammer roles */
     private RoleMap roleMap;
+    /** number of genomes processed */
+    private int gCount;
+    /** number of hammers found */
+    private long hCount;
+    /** sequence manager for contigs */
+    private SequenceManager seqManager;
+    /** start time of first genome */
+    private long start;
+    /** number of new genomes processed since the resume */
+    private int newGenomes;
+    /** total number of genomes in original set */
+    private int nGenomes;
 
     // COMMAND-LINE OPTIONS
 
@@ -82,12 +105,20 @@ public class HammerProcessor extends BaseReportProcessor {
     private File filterFile;
 
     /** TRUE for parallel mode */
-    @Option(name = "--para", usage = "if specified, parallel processing will be used (default FALSE)")
+    @Option(name = "--para", usage = "if specified, parallel processing will be used")
     private boolean paraMode;
 
     /** genome source type */
     @Option(name = "--source", usage = "genome source type")
     private GenomeSource.Type sourceType;
+
+    /** sequence iteration method type */
+    @Option(name = "--method", usage = "sequence iteration method")
+    private SequenceManager.Type methodType;
+
+    /** previous output file, for resume mode */
+    @Option(name = "--resume", metaVar = "oldOutput.tbl", usage = "if specified, the name of a previous output file from an interrupted run to be resumed")
+    private File resumeFile;
 
     /** name of the genome source file or directory */
     @Argument(index = 0, metaVar = "inDir", usage = "name of the genome source directory or file", required = true)
@@ -104,9 +135,11 @@ public class HammerProcessor extends BaseReportProcessor {
     @Override
     protected void setReporterDefaults() {
         this.filterFile = null;
+        this.resumeFile = null;
         this.paraMode = false;
         this.sourceType = GenomeSource.Type.DIR;
         this.kmerSize = 20;
+        this.methodType = SequenceManager.Type.FILE;
     }
 
     @Override
@@ -135,37 +168,96 @@ public class HammerProcessor extends BaseReportProcessor {
             this.genomes.getIDs().stream().filter(x -> filter.contains(x)).forEach(x -> this.genomeIdSet.add(x));
             log.info("{} genomes remaining after filter using {}.", this.genomeIdSet.size(), this.filterFile);
         }
-        // Set up parallelism and the kmer size.
+        // Check for the resume file.
+        if (this.resumeFile != null && ! this.resumeFile.canRead())
+            throw new FileNotFoundException("Previous-run output file " + this.resumeFile + " is not found or unreadable.");
+        // Set up the kmer size.
         if (this.kmerSize <= 1)
             throw new ParseFailureException("Hammer kmer size must be at least 2.");
         DnaKmers.setKmerSize(this.kmerSize);
-        GenomeHammerFactory.setParaMode(this.paraMode);
-        if (this.paraMode)
-            log.info("Parallel processing activated.");
+        // We don't parallelize at the low level, but on a genome basis instead.
+        GenomeHammerFactory.setParaMode(false);
+        // Set up the sequence manager.
+        this.seqManager = this.methodType.create(this.contigFile);
     }
 
     @Override
     protected void runReporter(PrintWriter writer) throws Exception {
+        // Clear the genome and hammer counters.
+        this.gCount = 0;
+        this.hCount = 0;
+        this.newGenomes = 0;
+        this.nGenomes = this.genomeIdSet.size();
         // Write the header line.
         writer.println("hammer\tfid");
-        // Set up some counters.
-        int gCount = 0;
-        final int gTotal = this.genomeIdSet.size();
+        // Handle the resume file, if any.
+        if (this.resumeFile != null)
+            this.processResume(writer);
         // Loop through the genomes.
-        long start = System.currentTimeMillis();
-        for (String genomeId : this.genomeIdSet) {
-            gCount++;
-            // Compute the hammers.
-            Genome genome = this.genomes.getGenome(genomeId);
-            log.info("Processing genome {} of {}: {}.", gCount, gTotal, genome);
-            GenomeHammerFactory factory = new GenomeHammerFactory(genome, this.roleMap);
-            log.info("Enforcing precision rules.");
-            factory.processFasta(this.contigFile);
-            // Write out the hammers.
+        if (this.paraMode) {
+            log.info("Parallel processing activated.");
+            this.start = System.currentTimeMillis();
+            this.genomeIdSet.parallelStream().forEach(x -> this.processGenome(x, writer));
+        } else {
+            log.info("Serial processing used.");
+            this.start = System.currentTimeMillis();
+            this.genomeIdSet.stream().forEach(x -> this.processGenome(x, writer));
+        }
+    }
+
+    /**
+     * Copy the previous run's output to the new output file, and remove the genomes already processed
+     * from the genome ID set.
+     *
+     * @param writer	print stream for new output
+     *
+     * @throws IOException
+     */
+    private void processResume(PrintWriter writer) throws IOException {
+        Set<String> removeSet = new HashSet<String>(1000);
+        try (TabbedLineReader oldStream = new TabbedLineReader(this.resumeFile)) {
+            log.info("Reading old output file {}.", this.resumeFile);
+            for (var line : oldStream) {
+                String hammer = line.get(0);
+                String fid = line.get(1);
+                String genome = Feature.genomeOf(fid);
+                removeSet.add(genome);
+                writer.println(hammer + "\t" + fid);
+                this.hCount++;
+                if (log.isInfoEnabled() && this.hCount % 100000 == 0)
+                    log.info("{} hammers read.", this.hCount);
+            }
+        }
+        log.info("{} genomes already processed with {} hammers.", removeSet.size(), this.hCount);
+        this.genomeIdSet.removeAll(removeSet);
+        log.info("{} genomes remaining to process.", this.genomeIdSet.size());
+        this.gCount = removeSet.size();
+    }
+
+    private void processGenome(String genomeId, PrintWriter writer) {
+        // Compute the hammers.
+        Genome genome = this.genomes.getGenome(genomeId);
+        log.info("Processing genome {} of {}: {}.", this.gCount + 1, this.nGenomes, genome);
+        GenomeHammerFactory factory = new GenomeHammerFactory(genome, this.roleMap);
+        log.info("Enforcing precision rules.");
+        int newHammers = 0;
+        try {
+            newHammers = factory.processFasta(this.seqManager);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        log.info("{} hammers found.", newHammers);
+        // Write out the hammers.
+        synchronized (this) {
             factory.dumpHammers(writer);
             writer.flush();
-            double seconds = (System.currentTimeMillis() - start) / (1000.0 * gCount);
-            log.info("{} seconds/genome, estimated {} seconds remaining.", seconds, seconds * (gTotal - gCount));
+            this.gCount++;
+            this.hCount += newHammers;
+            if (log.isInfoEnabled()) {
+                this.newGenomes++;
+                Duration genomeTime = Duration.ofMillis(((System.currentTimeMillis() - this.start) / this.newGenomes + 1) * (this.nGenomes - this.gCount));
+                log.info("{} genomes remaining, {} left.", this.nGenomes - this.gCount, genomeTime.toString());
+            }
         }
     }
 

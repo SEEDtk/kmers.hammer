@@ -3,7 +3,6 @@
  */
 package org.theseed.proteins.hammer;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,8 +15,7 @@ import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.proteins.RoleMap;
 import org.theseed.sequence.DnaKmers;
-import org.theseed.sequence.FastaInputStream;
-import org.theseed.sequence.Sequence;
+import org.theseed.sequence.SequenceManager;
 
 /**
  * This object takes as input a genome, a role map, and a FASTA file of contigs.  The contigs belong to genomes, and the
@@ -109,30 +107,34 @@ public class GenomeHammerFactory {
     /**
      * Read the FASTA file and delete non-discriminating kmers.
      *
-     * @param file	FASTA file to read; the comments must contain the genome IDs
+     * @param seqManager	sequence manager for FASTA file to read; the comments must contain the genome IDs
+     *
+     * @return the number of hammers found
      *
      * @throws IOException
      */
-    public void processFasta(File file) throws IOException {
+    public int processFasta(SequenceManager seqManager) throws IOException {
         int oldCount = this.kmerMap.size();
-        try (FastaInputStream fastaStream = new FastaInputStream(file)) {
-            int count = 0;
+        try (var iter = seqManager.newIterator()) {
             long timer = System.currentTimeMillis();
-            for (Sequence seq : fastaStream) {
+            int count = 0;
+            while (iter.hasNext()) {
+                var seq = iter.next();
+                count++;
                 if (! seq.getComment().contentEquals(this.genomeId)) {
                     var kmerStream = new SequenceKmerIterable(seq, DnaKmers.kmerSize());
                     kmerStream.stream(paraMode).forEach(x -> this.kmerMap.remove(x));
-                    count++;
-                    // Drop a progress message every 5 seconds or so.
-                    if (log.isInfoEnabled() && System.currentTimeMillis() - timer >= 5000) {
+                    // Drop a progress message every 60 seconds or so.
+                    if (log.isInfoEnabled() && System.currentTimeMillis() - timer >= 60 * 1000) {
                         timer = System.currentTimeMillis();
                         log.info("{} contigs processed.", count);
                     }
                 }
             }
         }
-        int newCount = this.kmerMap.size();
-        log.info("{} kmers remaining after processing {}.  {} removed.", newCount, file, oldCount - newCount);
+        int retVal = this.kmerMap.size();
+        log.info("{} kmers remaining after processing FASTA.  {} removed.", retVal, oldCount - retVal);
+        return retVal;
     }
 
     /**
