@@ -8,15 +8,21 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.theseed.utils.BaseReportProcessor;
 import org.theseed.utils.ParseFailureException;
+import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.java.erdb.DbConnection;
+import org.theseed.locations.Location;
 import org.theseed.proteins.hammer.HammerDb;
+import org.theseed.sequence.FastaInputStream;
+import org.theseed.sequence.Sequence;
 
 /**
  * This command analyzes a single FASTA file to look for hammer hits.  For each hit, it outputs the contig ID and location,
@@ -29,13 +35,15 @@ import org.theseed.proteins.hammer.HammerDb;
  * -h	display command-line usage
  * -v	display more frequent log messages
  * -o	output file (if not STDOUT)
- * -b	batch size for queries
+ * -b	batch size for queries (default 200)
+ * -B	optimal number of kilobases for each sequence group (default 100)
  *
- * --hType		type of hammer database
+ * --hType		type of hammer database (default MEMORY)
  * --file		file containing hammer database (either SQLite database or hammer flat file)
  * --url		URL of database (host and name, MySQL only)
  * --parms		database connection parameter string (MySQL only)
- * --type		database engine type
+ * --type		database engine type (default SQLITE)
+ * --headers	comma-delimited list of headers to use for the sequence comment (default "comment")
  *
  * @author Bruce Parrello
  *
@@ -47,12 +55,24 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
     protected static Logger log = LoggerFactory.getLogger(ContigTestProcessor.class);
     /** hammer database */
     private HammerDb hammers;
+    /** optimal number of base pairs per sequence group */
+    private int seqBatchSize;
+    /** number of sequences read */
+    private int seqsIn;
+    /** number of hits output */
+    private int hitsOut;
+    /** additional headers for sequence comment in output report */
+    private String[] headers;
 
     // COMMAND-LINE OPTIONS
 
     /** batch size for database or web queries */
     @Option(name = "--batch", aliases = { "-b" }, metaVar = "100", usage = "batch size for queries")
     private int batchSize;
+
+    /** batch size for sequences */
+    @Option(name = "--dnaBatch", aliases = { "-B" }, metaVar = "5", usage = "optimal number of kilobases for sequence groups")
+    private int seqBatchKSize;
 
     /** type of hammer database */
     @Option(name = "--hType", usage = "type of hammer database")
@@ -72,11 +92,15 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
     private String dbUrl;
 
     /** database parameter string */
-    @Option(name = "--parms", metaVar="user=xxx&pass=YYY", usage = "database parameter string (for MySQL")
+    @Option(name = "--parms", metaVar = "user=xxx&pass=YYY", usage = "database parameter string (for MySQL")
     private String dbParms;
 
+    /** comma-delimited list of headers for fields in sequence comments (if there are internal tabs) */
+    @Option(name = "--headers", metaVar = "name,rep_id,distance", usage = "comma-delimited list of headers to use for sequence comment fields")
+    private String headerList;
+
     /** input FASTA file name */
-    @Argument(index = 0, metaVar = "input.fa", usage = "name of the FASTA file containing the sequences to search")
+    @Argument(index = 0, metaVar = "input.fa", usage = "name of the FASTA file containing the sequences to search", required = true)
     private File inFile;
 
     @Override
@@ -87,14 +111,27 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
         this.dbFile = null;
         this.dbUrl = null;
         this.dbParms = null;
+        this.seqBatchKSize = 100;
+        this.headerList = "comment";
     }
 
     @Override
     protected void validateReporterParms() throws IOException, ParseFailureException {
+        // Verify the tuning parameters.
         if (this.batchSize < 1)
             throw new ParseFailureException("Batch size must be at least 1.");
+        if (this.seqBatchKSize < 1)
+            throw new ParseFailureException("Dna batch size must be at least 1.");
+        // Compute the batch size in base pairs.
+        this.seqBatchSize = this.seqBatchKSize * 1024;
+        // Verify the database file, if specified.
         if (this.dbFile != null && ! this.dbFile.canRead())
             throw new FileNotFoundException("Database file " + this.dbFile + " is not found or unreadable.");
+        // Verify the input file.
+        if (! this.inFile.canRead())
+            throw new FileNotFoundException("Input file " + this.inFile + " is not found or unreadable.");
+        // Parse the comment headers.
+        this.headers = StringUtils.split(this.headerList, ',');
         // Set up the hammer database.  We must convert SQL exceptions for compatability.
         try {
             this.hammers = this.hammerType.create(this);
@@ -105,7 +142,58 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
 
     @Override
     protected void runReporter(PrintWriter writer) throws Exception {
-        // TODO code for runReporter
+        // This will hold the current sequence batch.  It maps sequence labels to sequences.
+        Map<String, Sequence> batch = new HashMap<String, Sequence>(this.seqBatchSize * 4 / 9000 + 10);
+        int batchLen = 0;
+        // Clear the counters.
+        this.seqsIn = 0;
+        this.hitsOut = 0;
+        int batchCount = 0;
+        // Write the output headers.
+        writer.println("location\thammer_fid\t" + StringUtils.join(this.headers, '\t'));
+        // Loop through the sequence file.
+        try (FastaInputStream inStream = new FastaInputStream(this.inFile)) {
+            // Loop through the sequences.
+            for (Sequence seq : inStream) {
+                // Insure there is room for this sequence.
+                if (batchLen >= this.seqBatchSize) {
+                    batchCount++;
+                    log.info("Processing batch {} of length {}.", batchCount, batchLen);
+                    this.processBatch(batch, writer);
+                    batch.clear();
+                    batchLen = 0;
+                }
+                // Add the sequence to the batch.
+                batch.put(seq.getLabel(), seq);
+                batchLen += seq.length();
+                this.seqsIn++;
+            }
+            // Process the residual (if any).
+            if (batchLen > 0) {
+                log.info("Processing residual batch of length {}.", batchLen);
+                this.processBatch(batch, writer);
+            }
+        }
+    }
+
+    /**
+     * Process a sequence batch and write out the hits.
+     *
+     * @param batch		map of sequences to process, keyed by label
+     * @param writer	output file for hits
+     */
+    private void processBatch(Map<String, Sequence> batch, PrintWriter writer) {
+        // Get the hits for this batch.
+        var hits = this.hammers.findHits(batch.values());
+        for (HammerDb.Hit hit : hits) {
+            final Location hitLoc = hit.getLoc();
+            String locString = hitLoc.toSeedString();
+            String seqId = hitLoc.getContigId();
+            String comment = batch.get(seqId).getComment();
+            writer.println(locString + "\t" + hit.getFid() + "\t" + comment);
+            this.hitsOut++;
+        }
+        log.info("{} sequences processed and {} hits found.", this.seqsIn, this.hitsOut);
 
     }
 
