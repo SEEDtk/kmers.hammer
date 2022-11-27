@@ -69,7 +69,7 @@ public class GenomeHammerFactory {
                 this.extractKmers(fSeq, fid);
             }
         }
-        log.info("{} kmers found in {} useful features.", this.kmerMap.size(), usefulCount);
+        log.info("{} kmers found in {} useful features for {}.", this.kmerMap.size(), usefulCount, genome);
     }
 
     /**

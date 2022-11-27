@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -78,7 +80,7 @@ public class HammerProcessor extends BaseReportProcessor {
     /** input genome source */
     private GenomeSource genomes;
     /** filtered set of IDs for genomes to process */
-    private TreeSet<String> genomeIdSet;
+    private Set<String> genomeIdSet;
     /** role definition map for hammer roles */
     private RoleMap roleMap;
     /** number of genomes processed */
@@ -193,15 +195,17 @@ public class HammerProcessor extends BaseReportProcessor {
         // Handle the resume file, if any.
         if (this.resumeFile != null)
             this.processResume(writer);
+        // Now form the genome IDs into an immutable list.  This gets us more efficient parallel processing.
+        var genomeIdList = Collections.unmodifiableList(new ArrayList<String>(this.genomeIdSet));
         // Loop through the genomes.
         if (this.paraMode) {
             log.info("Parallel processing activated.");
             this.start = System.currentTimeMillis();
-            this.genomeIdSet.parallelStream().forEach(x -> this.processGenome(x, writer));
+            genomeIdList.parallelStream().forEach(x -> this.processGenome(x, writer));
         } else {
             log.info("Serial processing used.");
             this.start = System.currentTimeMillis();
-            this.genomeIdSet.stream().forEach(x -> this.processGenome(x, writer));
+            genomeIdList.stream().forEach(x -> this.processGenome(x, writer));
         }
     }
 
@@ -237,7 +241,7 @@ public class HammerProcessor extends BaseReportProcessor {
     private void processGenome(String genomeId, PrintWriter writer) {
         // Compute the hammers.
         Genome genome = this.genomes.getGenome(genomeId);
-        log.info("Processing genome {} of {}: {}.", this.gCount + 1, this.nGenomes, genome);
+        log.info("Processing genome {}.", genome);
         GenomeHammerFactory factory = new GenomeHammerFactory(genome, this.roleMap);
         log.info("Enforcing precision rules.");
         int newHammers = 0;
