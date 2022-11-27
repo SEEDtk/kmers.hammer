@@ -19,7 +19,7 @@ class TestKmerSeries {
     private static final List<String> TEST_LIST = List.of("aaatttcccgggaattccggatcg", "acgt", "acgttgcacg");
 
     @Test
-    void test() {
+    void testKmerSeries() {
         KmerSeries kSeries = new KmerSeries(TEST_LIST, 9);
         List<String> testSet = new ArrayList<String>(kSeries.size());
         for (String kmer : kSeries)

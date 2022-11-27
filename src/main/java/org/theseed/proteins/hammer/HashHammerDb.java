@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.theseed.counters.CountMap;
+import org.theseed.genome.Feature;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.ParseFailureException;
 
@@ -52,8 +53,8 @@ public class HashHammerDb extends HammerDb {
     protected class Loader implements HammerDb.ILoader {
 
         @Override
-        public void updateHammerMap(String genome, String hammer) {
-            HashHammerDb.this.hammerMap.put(hammer, genome);
+        public void updateHammerMap(String fid, String hammer) {
+            HashHammerDb.this.hammerMap.put(hammer, fid);
         }
 
         @Override
@@ -71,24 +72,39 @@ public class HashHammerDb extends HammerDb {
     }
 
     @Override
-    protected CountMap<String> findClosestInternal(Collection<Sequence> seqs, final int kSize) {
-        CountMap<String> retVal = new CountMap<String>();
-        for (Sequence seq : seqs) {
-            String dna = seq.getSequence();
-            final int n = dna.length() - kSize;
-            for (int i = 0; i < n; i++) {
-                String kmer = dna.substring(i, i + kSize);
-                String genomeId = this.hammerMap.get(kmer);
-                if (genomeId != null)
-                    retVal.count(genomeId);
-            }
+    protected void findClosestInternal(CountMap<String> map, Collection<Sequence> seqs, final int kSize) {
+        Iterable<String> kIter = KmerSeries.init(seqs, kSize);
+        for (String kmer : kIter) {
+            String fid = this.hammerMap.get(kmer);
+            if (fid != null)
+                map.count(Feature.genomeOf(fid));
         }
-        return retVal;
     }
 
     @Override
     protected ILoader getLoader() {
         return this.new Loader();
+    }
+
+    @Override
+    protected void findHitsInternal(Collection<Hit> collection, Collection<Sequence> seqs, int kSize, boolean dir) {
+        log.debug("Scanning {} sequences for hammer hits with strand flag {}.", seqs.size(), dir);
+        for (Sequence seq : seqs) {
+            String dna = seq.getSequence();
+            final int len = dna.length();
+            String contigId = seq.getLabel();
+            final int n = len - kSize;
+            // We loop through the sequence with a character index, since we need the location of the hit.
+            for (int i = 0; i <= n; i++) {
+                String kmer = dna.substring(i, i + kSize);
+                String fid = this.hammerMap.get(kmer);
+                if (fid != null) {
+                    // Here we have a hammer hit.  Form the hit descriptor.
+                    var hit = new HammerDb.Hit(contigId, len, i, dir, fid, kSize);
+                    collection.add(hit);
+                }
+            }
+        }
     }
 
 }

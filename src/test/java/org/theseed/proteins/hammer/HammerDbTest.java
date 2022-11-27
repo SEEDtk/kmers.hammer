@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import org.theseed.counters.CountMap;
 import org.theseed.genome.Genome;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.sqlite.SqliteDbConnection;
+import org.theseed.locations.Location;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.ParseFailureException;
@@ -79,6 +82,31 @@ class HammerDbTest {
         results = counts.sortedCounts();
         assertThat(results.size(), equalTo(4));
         assertThat(results.get(0).getKey(), equalTo("2485170.3"));
+        File hitFile = new File("data", "hammer.hit.test.fa");
+        seqs = FastaInputStream.readAll(hitFile);
+        var hits = hammers.findHits(seqs);
+        assertThat(hits.size(), equalTo(7));
+        Set<String> fidsHit = hits.stream().map(x -> x.getFid()).collect(Collectors.toSet());
+        assertThat(fidsHit, containsInAnyOrder("fig|1278308.3.peg.2084", "fig|1278308.3.peg.2569", "fig|1397.4.peg.5364"));
+        for (var hit : hits) {
+            String fid = hit.getFid();
+            switch (fid) {
+            case "fig|1278308.3.peg.2084" :
+                assertThat(fid, hit.getLoc(), anyOf(equalTo(Location.create("seq2", 30, 11)),
+                        equalTo(Location.create("seq2", 31, 12))));
+                break;
+            case "fig|1278308.3.peg.2569" :
+                assertThat(fid, hit.getLoc(), anyOf(equalTo(Location.create("seq2", 49, 66)),
+                        equalTo(Location.create("seq1", 129, 110)),
+                        equalTo(Location.create("seq2", 50, 67)),
+                        equalTo(Location.create("seq2", 51, 68))));
+                break;
+            case "fig|1397.4.peg.5364" :
+                assertThat(fid, hit.getLoc(), equalTo(Location.create("seq4", 42, 59)));
+                break;
+            }
+        }
+
     }
 
 }

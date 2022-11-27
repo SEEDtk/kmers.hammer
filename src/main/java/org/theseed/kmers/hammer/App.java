@@ -13,6 +13,7 @@ import org.theseed.utils.BaseProcessor;
  *  define		create a hammer definition file from a roles.in.subsystems file
  *  dbLoad		load a hammer database from a flat file
  *  binTest		separate contigs into bins using hammers
+ *  contigTest	analyze a contig FASTA file using hammers
  */
 public class App
 {
@@ -40,6 +41,9 @@ public class App
             break;
         case "binTest" :
             processor = new BinTestProcessor();
+            break;
+        case "contigTest" :
+            processor = new ContigTestProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

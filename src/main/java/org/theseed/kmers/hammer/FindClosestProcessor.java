@@ -126,7 +126,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         // Validate the batch size.
         if (this.batchSize < 1)
             throw new ParseFailureException("Batch size must be at least 1.");
-        // We must convert SQL exceptions for compatability.Mo
+        // We must convert SQL exceptions for compatability.
         try {
             this.hammers = this.hammerType.create(this);
         } catch (SQLException e) {

@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.theseed.genome.Contig;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.proteins.RoleMap;
@@ -64,11 +63,10 @@ public class GenomeHammerFactory {
         for (Feature feat : genome.getPegs()) {
             if (feat.isInteresting(roles)) {
                 usefulCount++;
-                // Here we have a feature of interest.  Extract its kmers in each direction.
+                // Here we have a feature of interest.  Extract its kmers.
                 String fid = feat.getId();
                 String fSeq = genome.getDna(fid);
                 this.extractKmers(fSeq, fid);
-                this.extractKmers(Contig.reverse(fSeq), fid);
             }
         }
         log.info("{} kmers found in {} useful features.", this.kmerMap.size(), usefulCount);

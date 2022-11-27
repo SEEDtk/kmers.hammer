@@ -28,7 +28,7 @@ class TestKmerIterable {
 
 
     @Test
-    void test() throws FileNotFoundException {
+    void testKmerIterable() throws FileNotFoundException {
         // We read all the sequences and test them one at a time.
         File contigFile = new File("data", "contigs.fa");
         try (FastaInputStream contigStream = new FastaInputStream(contigFile)) {

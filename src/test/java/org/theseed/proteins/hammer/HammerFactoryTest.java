@@ -27,7 +27,7 @@ class HammerFactoryTest {
     protected static Logger log = LoggerFactory.getLogger(HammerFactoryTest.class);
 
     @Test
-    void test() throws IOException {
+    void testHammerFactory() throws IOException {
         File gFile = new File("data", "1002870.3.gto");
         DnaKmers.setKmerSize(20);
         Genome genome = new Genome(gFile);
