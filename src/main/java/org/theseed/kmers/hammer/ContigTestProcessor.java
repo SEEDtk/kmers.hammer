@@ -27,23 +27,23 @@ import org.theseed.sequence.Sequence;
 /**
  * This command analyzes a single FASTA file to look for hammer hits.  For each hit, it outputs the contig ID and location,
  * the ID of the feature from which the hammer was harvested, and the contig comment.  This information can be used to
- * determine how good the hits were.
+ * determine how good the hits were. *
  *
- *
- * The positional parameter is the name of the FASTA file.  The command-line options are as follows.
+ * The positional parameter is the name of the FASTA file.  It is recommended that "genome.bins synth" be used to generate
+ * the input file. The command-line options are as follows.
  *
  * -h	display command-line usage
  * -v	display more frequent log messages
  * -o	output file (if not STDOUT)
  * -b	batch size for queries (default 200)
- * -B	optimal number of kilobases for each sequence group (default 100)
+ * -B	optimal number of kilobases for each sequence group (default 1000)
  *
  * --hType		type of hammer database (default MEMORY)
  * --file		file containing hammer database (either SQLite database or hammer flat file)
  * --url		URL of database (host and name, MySQL only)
  * --parms		database connection parameter string (MySQL only)
  * --type		database engine type (default SQLITE)
- * --headers	comma-delimited list of headers to use for the sequence comment (default "comment")
+ * --headers	comma-delimited list of headers to use for the sequence comment (default "genome_name,rep_id,distance")
  *
  * @author Bruce Parrello
  *
@@ -96,7 +96,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
     private String dbParms;
 
     /** comma-delimited list of headers for fields in sequence comments (if there are internal tabs) */
-    @Option(name = "--headers", metaVar = "name,rep_id,distance", usage = "comma-delimited list of headers to use for sequence comment fields")
+    @Option(name = "--headers", metaVar = "genome_id,name", usage = "comma-delimited list of headers to use for sequence comment fields")
     private String headerList;
 
     /** input FASTA file name */
@@ -111,8 +111,8 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
         this.dbFile = null;
         this.dbUrl = null;
         this.dbParms = null;
-        this.seqBatchKSize = 100;
-        this.headerList = "comment";
+        this.seqBatchKSize = 1000;
+        this.headerList = "genome_name,rep_id,distance";
     }
 
     @Override
@@ -174,6 +174,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
                 this.processBatch(batch, writer);
             }
         }
+        log.info("{} sequences read and {} hits found.", this.seqsIn, this.hitsOut);
     }
 
     /**
@@ -185,16 +186,17 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
     private void processBatch(Map<String, Sequence> batch, PrintWriter writer) {
         // Get the hits for this batch.
         var hits = this.hammers.findHits(batch.values());
+        int hitCount = 0;
         for (HammerDb.Hit hit : hits) {
             final Location hitLoc = hit.getLoc();
             String locString = hitLoc.toSeedString();
             String seqId = hitLoc.getContigId();
             String comment = batch.get(seqId).getComment();
             writer.println(locString + "\t" + hit.getFid() + "\t" + comment);
-            this.hitsOut++;
+            hitCount++;
         }
-        log.info("{} sequences processed and {} hits found.", this.seqsIn, this.hitsOut);
-
+        log.info("{} sequences in batch with {} hits found.", batch.size(), hitCount);
+        this.hitsOut += hitCount;
     }
 
     @Override
