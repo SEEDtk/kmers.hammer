@@ -81,7 +81,7 @@ public class GenomeHammerFactory {
      */
     private void extractKmers(String seq, String fid) {
         var kmerStream = new SequenceKmerIterable(seq, DnaKmers.kmerSize());
-        kmerStream.stream(paraMode).forEach(x -> this.kmerMap.put(x, fid));
+        kmerStream.stream(paraMode).filter(x -> DnaKmers.isClean(x)).forEach(x -> this.kmerMap.put(x, fid));
     }
 
     /**

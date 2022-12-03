@@ -14,6 +14,8 @@ import org.theseed.utils.BaseProcessor;
  *  dbLoad		load a hammer database from a flat file
  *  binTest		separate contigs into bins using hammers
  *  contigTest	analyze a contig FASTA file using hammers
+ *  scanTest	analyze the results of a synthetic hammer test
+ *  scanLocs	compare features hit by bad hammer matches in a synthetic test
  */
 public class App
 {
@@ -44,6 +46,12 @@ public class App
             break;
         case "contigTest" :
             processor = new ContigTestProcessor();
+            break;
+        case "scanTest" :
+            processor = new ContigTestAnalysisProcessor();
+            break;
+        case "scanLocs" :
+            processor = new ContigTestLocationProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

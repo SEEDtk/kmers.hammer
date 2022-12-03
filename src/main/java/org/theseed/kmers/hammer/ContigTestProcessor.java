@@ -196,7 +196,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
             hitCount++;
         }
         writer.flush();
-        log.info("{} sequences in batch with {} hits found.", batch.size(), hitCount);
+        log.info("{} sequences in batch with {} hits found. {} total sequences read.", batch.size(), hitCount, this.seqsIn);
         this.hitsOut += hitCount;
     }
 
