@@ -14,6 +14,7 @@ import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.proteins.RoleMap;
 import org.theseed.sequence.DnaKmers;
+import org.theseed.sequence.Sequence;
 import org.theseed.sequence.SequenceManager;
 
 /**
@@ -120,8 +121,8 @@ public class GenomeHammerFactory {
                 var seq = iter.next();
                 count++;
                 if (! seq.getComment().contentEquals(this.genomeId)) {
-                    var kmerStream = new SequenceKmerIterable(seq, DnaKmers.kmerSize());
-                    kmerStream.stream(paraMode).forEach(x -> this.kmerMap.remove(x));
+                    this.precisionCheck(seq);
+                    this.precisionCheck(seq.reverse());
                     // Drop a progress message every 60 seconds or so.
                     if (log.isInfoEnabled() && System.currentTimeMillis() - timer >= 60 * 1000) {
                         timer = System.currentTimeMillis();
@@ -133,6 +134,14 @@ public class GenomeHammerFactory {
         int retVal = this.kmerMap.size();
         log.info("{} kmers remaining after processing FASTA.  {} removed.", retVal, oldCount - retVal);
         return retVal;
+    }
+
+    /**
+     * @param seq
+     */
+    protected void precisionCheck(Sequence seq) {
+        var kmerStream = new SequenceKmerIterable(seq, DnaKmers.kmerSize());
+        kmerStream.stream(paraMode).forEach(x -> this.kmerMap.remove(x));
     }
 
     /**
