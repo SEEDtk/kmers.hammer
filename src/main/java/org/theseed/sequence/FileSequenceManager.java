@@ -28,6 +28,8 @@ public class FileSequenceManager extends SequenceManager {
 
         /** fasta input stream */
         private FastaInputStream stream;
+        /** last sequence read; if it is not NULL, we return the reverse complement */
+        private Sequence seq;
 
         /**
          * Create an iterator through the file.
@@ -35,6 +37,7 @@ public class FileSequenceManager extends SequenceManager {
         public Iter() {
             try {
                 this.stream = new FastaInputStream(FileSequenceManager.this.fastaFile);
+                this.seq = null;
             } catch (FileNotFoundException e) {
                 throw new UncheckedIOException(e);
             }
@@ -42,12 +45,23 @@ public class FileSequenceManager extends SequenceManager {
 
         @Override
         public boolean hasNext() {
-            return this.stream.hasNext();
+            return this.stream.hasNext() || this.seq != null;
         }
 
         @Override
         public Sequence next() {
-            return this.stream.next();
+            Sequence retVal;
+            if (this.seq != null) {
+                // Here we need to reverse the previous sequence.
+                retVal = seq.reverse();
+                // Insure we read from the file next time.
+                this.seq = null;
+            } else {
+                // Here we need to read from the file.
+                this.seq = this.stream.next();
+                retVal = this.seq;
+            }
+            return retVal;
         }
 
         @Override

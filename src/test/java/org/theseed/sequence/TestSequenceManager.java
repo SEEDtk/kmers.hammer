@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Bruce Parrello
@@ -19,13 +21,19 @@ import org.junit.jupiter.api.Test;
  */
 class TestSequenceManager {
 
+    /** logging facility */
+    protected static Logger log = LoggerFactory.getLogger(TestSequenceManager.class);
+
+
     @Test
     void test() throws IOException {
         List<Sequence> list = new ArrayList<Sequence>(8);
         File contigs = new File("data", "contigs.fa");
         try (FastaInputStream inStream = new FastaInputStream(contigs)) {
-            for (var seq : inStream)
+            for (var seq : inStream) {
                 list.add(seq);
+                list.add(seq.reverse());
+            }
         }
         // We can use the list above to verify the results.
         SequenceManager mgr1 = SequenceManager.Type.FILE.create(contigs);
@@ -48,6 +56,7 @@ class TestSequenceManager {
             assertThat(iter1b.hasNext(), equalTo(false));
             assertThat(iter2a.hasNext(), equalTo(false));
             assertThat(iter2b.hasNext(), equalTo(false));
+            log.info("{} sequences processed.", count);
         }
     }
 

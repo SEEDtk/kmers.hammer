@@ -73,13 +73,14 @@ public class CacheSequenceManager extends SequenceManager {
         try (var inStream = new FastaInputStream(file)) {
             for (Sequence seq : inStream) {
                 this.seqs.add(seq);
+                this.seqs.add(seq.reverse());
                 len += seq.length();
                 count++;
                 if (log.isInfoEnabled() && count % 5000 == 0)
                     log.info("{} sequences read from file.", count);
             }
         }
-        log.info("{} sequences with {} letters read from file.", seqs.size(), len);
+        log.info("{} sequences with {} letters read from file.", count, len);
     }
 
     @Override

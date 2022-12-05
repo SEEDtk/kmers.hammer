@@ -122,7 +122,6 @@ public class GenomeHammerFactory {
                 count++;
                 if (! seq.getComment().contentEquals(this.genomeId)) {
                     this.precisionCheck(seq);
-                    this.precisionCheck(seq.reverse());
                     // Drop a progress message every 60 seconds or so.
                     if (log.isInfoEnabled() && System.currentTimeMillis() - timer >= 60 * 1000) {
                         timer = System.currentTimeMillis();

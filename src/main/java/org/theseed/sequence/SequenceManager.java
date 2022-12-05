@@ -45,14 +45,14 @@ public abstract class SequenceManager {
      * Enumeration for the types of sequence managers supported.
      */
     public enum Type {
-        /** cache the entire sequence set in memory */
+        /** cache the entire sequence set in memory, along with reverse complements */
         MEMORY {
             @Override
             public SequenceManager create(File file) throws IOException {
                 return new CacheSequenceManager(file);
             }
         },
-        /** read the sequences in from the file one at a time */
+        /** read the sequences in from the file one at a time, presenting reverse complements */
         FILE {
             @Override
             public SequenceManager create(File file) throws IOException {
