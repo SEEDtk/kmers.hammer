@@ -23,6 +23,7 @@ import org.theseed.io.TabbedLineReader;
 import org.theseed.locations.Location;
 import org.theseed.locations.LocationFinder;
 import org.theseed.reports.NaturalSort;
+import org.theseed.sequence.RnaKmers;
 import org.theseed.utils.BasePipeProcessor;
 import org.theseed.utils.ParseFailureException;
 
@@ -67,6 +68,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     private int repColIdx;
     /** current hammer genome */
     private Genome hammerGenome;
+    /** expected representative genome */
+    private Genome repGenome;
     /** number of hits processed */
     private int hitCount;
     /** position in a hammer hit location input string at which to find the real location string */
@@ -183,6 +186,13 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             return this.goodHit;
         }
 
+        /**
+         * @return the hammer length
+         */
+        protected int getHammerLen() {
+            return this.hitLoc.getLength();
+        }
+
     }
 
     @Override
@@ -203,6 +213,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         log.info("Loading target genome from {}.", this.sourceDir);
         this.targetGenome = this.genomes.getGenome(this.targetID);
         this.targetFinder = new LocationFinder(this.targetGenome);
+        // Denote we have not loaded the representative genome.
+        this.repGenome = null;
         // Compute the position in each hit location string from the input where the real location string begins.
         this.residualIdx = this.targetID.length() + 1;
         // Initialize the hit tracking.
@@ -236,6 +248,11 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 String repId = line.get(this.repColIdx);
                 HammerHit hit = this.new HammerHit(hitLocString, hammerFid, repId);
                 this.hitSet.add(hit);
+                // Insure the representative genome is in memory.
+                if (this.repGenome == null) {
+                    this.repGenome = this.genomes.getGenome(repId);
+                    log.info("Representative genome {} loaded.", this.repGenome);
+                }
             }
             // Count the line in.
             inCount++;
@@ -245,23 +262,45 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         log.info("{} total hammer hits kept.", this.hitCount);
         // Now we process the individual hits to produce the output.
         log.info("Writing output.");
-        writer.println("target_fid\ttarget_function\thammer\thammer_genome\thammer_fid\thammer_function\tgood_hit");
+        writer.println("target_fid\ttarget_function\tsim_to_hammer\tsim_to_rep\thammer\thammer_genome\thammer_fid\thammer_function\tgood_hit");
+        // These will track the current hammer feature and genome.
+        String hammerFid = "";
+        String hammerGenomeId = "";
+        Feature hammerFeature = null;
+        String hammerFunction = "";
+        RnaKmers repKmers = null;
+        RnaKmers hammerKmers = null;
         // We need some counters.
         int goodHits = 0;
         int badHits = 0;
         int multiHits = 0;
         int openHits = 0;
         for (HammerHit hit : this.hitSet) {
+            // Remember the hammer length.
+            int hammerLen = hit.getHammerLen();
             // Compute the hammer's source feature.  This may require loading a new hammer genome.
-            String hammerGenomeId = hit.getSourceGenomeId();
-            if (this.hammerGenome == null || ! this.hammerGenome.getId().contentEquals(hammerGenomeId)) {
+            if (! hammerGenomeId.contentEquals(hit.getSourceGenomeId())) {
+                hammerGenomeId = hit.getSourceGenomeId();
                 this.hammerGenome = this.genomes.getGenome(hammerGenomeId);
                 log.info("Hammer genome {} loaded.", this.hammerGenome);
             }
-            Feature hammerFeature = this.hammerGenome.getFeature(hit.getSourceFeatureId());
-            // Get the hammer itself and the feature's function.
+            if (! hammerFid.contentEquals(hit.getSourceFeatureId())) {
+                // Here we have a new hammer feature.  This is a feature in the genome the hammer came from.
+                hammerFid = hit.getSourceFeatureId();
+                hammerFeature = this.hammerGenome.getFeature(hammerFid);
+                hammerFunction = hammerFeature.getPegFunction();
+                // Get a kmer structure for the corresponding features in the representative genome.  We scan the whole
+                // genome and pick off each sequence that has the same function.
+                repKmers = new RnaKmers(hammerLen);
+                for (Feature repFeat : this.repGenome.getPegs()) {
+                    if (repFeat.getPegFunction().contentEquals(hammerFunction))
+                        repKmers.addSequence(repFeat.getDna());
+                }
+                // Get a kmer structure for the hammer feature.
+                hammerKmers = new RnaKmers(hammerFeature.getDna(), hammerLen);
+            }
+            // Get the hammer itself.
             String hammerDNA = hit.getHammerDna();
-            String hammerFunction = hammerFeature.getPegFunction();
             // Determine the type of hit.
             boolean goodHit = hit.isGoodHit();
             if (goodHit)
@@ -275,14 +314,19 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             var targetFeats = hit.getHitFeatures();
             if (targetFeats.size() == 0) {
                 // Here the target region is outside any called features.
-                writer.println(this.targetID + "\t<uncalled region>" + trailer);
+                writer.println(this.targetID + "\t<uncalled region>\t\t" + trailer);
                 openHits++;
             } else {
                 if (targetFeats.size() > 1)
                     multiHits++;
                 // Here we have one or more features covering the region hit.
-                for (Feature feat : targetFeats)
-                    writer.println(feat.getId() + "\t" + feat.getFunction() + trailer);
+                for (Feature feat : targetFeats) {
+                    // Compute the sims for this feature.
+                    RnaKmers featKmers = new RnaKmers(feat.getDna(), hammerLen);
+                    int simToHammer = featKmers.similarity(hammerKmers);
+                    int simToRep = featKmers.similarity(repKmers);
+                    writer.format("%s\t%s\t%d\t%d%s%n", feat.getId(), feat.getFunction(), simToHammer, simToRep, trailer);
+                }
             }
         }
         log.info("{} good hits, {} bad hits, {} open-region hits, {} multi-feature hits.", goodHits, badHits, openHits, multiHits);

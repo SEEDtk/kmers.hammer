@@ -47,6 +47,7 @@ import org.theseed.utils.ParseFailureException;
  *
  * --summary	if specified, only genome records will be output
  * --limit		maximum number of hit targets to output per genome (default 10)
+ * --misses		if specified, the name of a summary file showing the genomes that were placed close to the wrong representative
  *
  * @author Bruce Parrello
  *
@@ -68,6 +69,8 @@ public class ContigTestAnalysisProcessor extends BasePipeProcessor {
     private int distIdx;
     /** map of representing genome IDs to names */
     private Map<String, String> rNameMap;
+    /** output writer for wrong-genome summary */
+    private PrintWriter missesStream;
 
     // COMMAND-LINE OPTIONS
 
@@ -78,6 +81,10 @@ public class ContigTestAnalysisProcessor extends BasePipeProcessor {
     /** maxmimum number of hit counts to output per object */
     @Option(name = "--limit", usage = "maximum number of hit counts to output per object (0 for all)")
     private int limitCount;
+
+    /** file to contain a summary report for the misses */
+    @Option(name = "--misses", metaVar = "wrongResults.tbl", usage = "if specified, the name of a file to contain the genomes that were assigned the wrong representative")
+    private File missFile;
 
     /** stats file containing representative genome IDs and names */
     @Argument(index = 0, metaVar = "repXX.stats.tbl", usage = "name of a file containing representing genome IDs and names")
@@ -204,6 +211,7 @@ public class ContigTestAnalysisProcessor extends BasePipeProcessor {
     protected void setPipeDefaults() {
         this.summaryOnly = false;
         this.limitCount = 10;
+        this.missFile = null;
     }
 
     @Override
@@ -224,38 +232,51 @@ public class ContigTestAnalysisProcessor extends BasePipeProcessor {
         // Read in the IDs and names.
         this.rNameMap = TabbedLineReader.readMap(this.repFileName, "rep_id", "rep_name");
         log.info("{} representing genome IDs found in {}.", this.rNameMap.size(), this.repFileName);
+        // Set up the missed-call report.
+        if (this.missFile == null)
+            this.missesStream = null;
+        else {
+            log.info("Missed-call summary report will be written to {}.", this.missFile);
+            this.missesStream = new PrintWriter(this.missFile);
+            this.missesStream.println("genome_id\tgenome_name\tgood_hits\tbad_hits\tall_hits\tactual\texpected");
+        }
     }
 
     @Override
     protected void runPipeline(TabbedLineReader inputStream, PrintWriter writer) throws Exception {
-        // This maps each incoming genome ID to the useful data we need about it.
-        Map<String, GenomeData> gDataMap = new HashMap<String, GenomeData>(1000);
-        // Loop through the input, counting each hit.
-        log.info("Reading hits from input.");
-        int hitCount = 0;
-        for (var line : inputStream) {
-            Location loc = Location.parseSeedLocation(line.get(this.locationColIdx));
-            String contigId = loc.getContigId();
-            String genomeId = StringUtils.substringBefore(contigId, ":");
-            String repId = line.get(this.repColIdx);
-            double dist = line.getDouble(this.distIdx);
-            String name = line.get(this.nameColIdx);
-            // Get the descriptor for the genome hit.
-            GenomeData gData = gDataMap.computeIfAbsent(genomeId, x -> new GenomeData(x, name, repId, dist));
-            // Compute the genome hit.
-            String hitGenomeId = Feature.genomeOf(line.get(this.hitColIdx));
-            // Record the hit.
-            gData.count(contigId, hitGenomeId);
-            hitCount++;
-            if (log.isInfoEnabled() && hitCount % 100000 == 0)
-                log.info("{} hits processed.", hitCount);
+        try {
+            // This maps each incoming genome ID to the useful data we need about it.
+            Map<String, GenomeData> gDataMap = new HashMap<String, GenomeData>(1000);
+            // Loop through the input, counting each hit.
+            log.info("Reading hits from input.");
+            int hitCount = 0;
+            for (var line : inputStream) {
+                Location loc = Location.parseSeedLocation(line.get(this.locationColIdx));
+                String contigId = loc.getContigId();
+                String genomeId = StringUtils.substringBefore(contigId, ":");
+                String repId = line.get(this.repColIdx);
+                double dist = line.getDouble(this.distIdx);
+                String name = line.get(this.nameColIdx);
+                // Get the descriptor for the genome hit.
+                GenomeData gData = gDataMap.computeIfAbsent(genomeId, x -> new GenomeData(x, name, repId, dist));
+                // Compute the genome hit.
+                String hitGenomeId = Feature.genomeOf(line.get(this.hitColIdx));
+                // Record the hit.
+                gData.count(contigId, hitGenomeId);
+                hitCount++;
+                if (log.isInfoEnabled() && hitCount % 100000 == 0)
+                    log.info("{} hits processed.", hitCount);
+            }
+            log.info("{} hits processed from {} genomes.", hitCount, gDataMap.size());
+            // Now we write the output.
+            log.info("Producing report.");
+            writer.println("object_id\tgenome_name\thit_id\thit_name\tcount\texpected\tdist_to_exp");
+            // Loop through the genome descriptors in natural sort order.
+            gDataMap.values().stream().sorted().forEach(x -> this.writeGenome(writer, x));
+        } finally {
+            if (this.missesStream != null)
+                this.missesStream.close();
         }
-        log.info("{} hits processed from {} genomes.", hitCount, gDataMap.size());
-        // Now we write the output.
-        log.info("Producing report.");
-        writer.println("object_id\tgenome_name\thit_id\thit_name\tcount\texpected\tdist_to_exp");
-        // Loop through the genome descriptors in natural sort order.
-        gDataMap.values().stream().sorted().forEach(x -> this.writeGenome(writer, x));
     }
 
     /**
@@ -276,6 +297,23 @@ public class ContigTestAnalysisProcessor extends BasePipeProcessor {
             contigMap.entrySet().stream().forEach(x -> this.showHitCounts(writer, x.getKey(), gDatum, x.getValue()));
         }
         log.info("{} ({}) written to output.", gDatum.getGenomeID(), gDatum.getGenomeName());
+        // If there is a missed-call report, write to it here.
+        if (this.missesStream != null) {
+            var expected = gDatum.getRepId();
+            CountMap<String>.Count actual = counts.getBestEntry();
+            // If there were no hits we do a special line.
+            if (actual == null)
+                writer.println(gDatum.getGenomeID() + "\t" + gDatum.getGenomeName() + "\t0\t0\t0\t\t" + expected);
+            else {
+                String actualId = actual.getKey();
+                if (! actualId.contentEquals(expected)) {
+                    var goodHits = counts.getCount(expected);
+                    var allHits = counts.getTotal();
+                    this.missesStream.format("%s\t%s\t%d\t%d\t%d\t%s\t%s%n", gDatum.getGenomeID(), gDatum.getGenomeName(),
+                            goodHits, actual.getCount(), allHits, actual.getKey(), expected);
+                }
+            }
+        }
     }
 
     /**
