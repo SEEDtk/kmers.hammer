@@ -22,6 +22,7 @@ import org.theseed.java.erdb.DbLoader;
 import org.theseed.java.erdb.DbQuery;
 import org.theseed.java.erdb.DbRecord;
 import org.theseed.java.erdb.SqlBuffer;
+import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 
 /**

@@ -11,6 +11,7 @@ import java.util.Map;
 
 import org.theseed.counters.CountMap;
 import org.theseed.genome.Feature;
+import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.ParseFailureException;
 
