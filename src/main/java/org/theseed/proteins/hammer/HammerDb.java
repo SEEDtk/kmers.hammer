@@ -121,7 +121,7 @@ public abstract class HammerDb {
             if (dir) {
                 // Here we have a hit on the + strand.  The locations are 1-based, so we adjust the 0-based idx.
                 start = idx + 1;
-                end = idx + kSize - 2;
+                end = idx + kSize;
             } else {
                 // Here we have a hit on the - strand.  The start location is therefore counted from the end of the contig.
                 start = len - idx;
