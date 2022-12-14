@@ -87,7 +87,7 @@ class TestKmerIterable {
         var originalCounts = new HashMap<String, Counter>(16000);
         int len = seqString.length();
         int limit = len - K;
-        for (int i = 0; i < limit; i++) {
+        for (int i = 0; i <= limit; i++) {
             String kmer = seqString.substring(i, i + K);
             countKmer(originalCounts, kmer);
         }
@@ -137,6 +137,7 @@ class TestKmerIterable {
      * @param kmer		kmer to count
      */
     private void countKmer(Map<String, Counter> countMap, String kmer) {
+        assertThat(kmer, kmer.length(), equalTo(K));
         Counter c = countMap.computeIfAbsent(kmer, x -> new Counter());
         c.increment();
     }

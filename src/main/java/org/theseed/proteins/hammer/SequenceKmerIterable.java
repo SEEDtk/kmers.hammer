@@ -165,7 +165,7 @@ public class SequenceKmerIterable implements Iterable<String> {
      * @return the position beyond the last permissible kmer start for this sequence
      */
     public int getLimit() {
-        return this.seqString.length() - this.kmerSize;
+        return this.seqString.length() - this.kmerSize + 1;
     }
 
     @Override

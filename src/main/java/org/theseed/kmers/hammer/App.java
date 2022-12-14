@@ -8,6 +8,7 @@ import org.theseed.utils.BaseProcessor;
  * This program processes DNA hammers.  The commands are as follows.
  *
  *  hammers		find all the hammers for a specified set of genomes
+ *  hammersF	use a protein-finder to find all the hammers for a specified repgen set
  *  closest		compute the closest genomes using the hammers
  *  contigs		create a FASTA file for a hammer processor from a genome directory
  *  define		create a hammer definition file from a roles.in.subsystems file
@@ -28,6 +29,9 @@ public class App
         switch (command) {
         case "hammers" :
             processor = new HammerProcessor();
+            break;
+        case "hammersF" :
+            processor = new HammerFinderProcessor();
             break;
         case "closest" :
             processor = new FindClosestProcessor();
