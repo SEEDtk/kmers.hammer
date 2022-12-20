@@ -17,6 +17,7 @@ import org.theseed.utils.BaseProcessor;
  *  contigTest	analyze a contig FASTA file using hammers
  *  scanTest	analyze the results of a synthetic hammer test
  *  scanLocs	compare features hit by bad hammer matches in a synthetic test
+ *  distTest	compute the ANI distances to the expected and actual choices in a synthetic test
  */
 public class App
 {
@@ -56,6 +57,9 @@ public class App
             break;
         case "scanLocs" :
             processor = new ContigTestLocationProcessor();
+            break;
+        case "distTest" :
+            processor = new ContigTestDistanceProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

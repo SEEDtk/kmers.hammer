@@ -75,6 +75,11 @@
         <artifactId>java.erdb</artifactId>
         <version>1.0.0</version>
     </dependency>
+    <dependency>
+        <groupId>org.theseed</groupId>
+        <artifactId>genome.distance</artifactId>
+        <version>1.0.0</version>
+    </dependency>
         <!-- Testing dependencies-->
     <dependency>
       <groupId>org.hamcrest</groupId>

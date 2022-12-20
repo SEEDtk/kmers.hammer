@@ -197,43 +197,47 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      */
     private Map<String, HammerScore> getPotentialHammers() {
         // The potential hammers are stored in here.
-        Map<String, HammerScore> retVal = new HashMap<String, HammerScore>(this.neighborMap.size() * 20000);
+        Map<String, HammerScore> retVal = new HashMap<String, HammerScore>(this.neighborMap.size() * 4000);
         // Common kmers are kept in here.
-        Set<String> commonSet = new HashSet<String>(this.neighborMap.size() * 1000);
+        Set<String> commonSet = new HashSet<String>(this.neighborMap.size() * 150);
         // Loop through the representatives.
         for (var repEntry : this.neighborMap.entrySet()) {
             String repId = repEntry.getKey();
-            Set<String> neighbors = repEntry.getValue();
-            log.info("Scanning representative genome {} with {} neighbors.", repId, neighbors.size() - 1);
-            // Loop through all its sequences.
-            int commonCount = 0;
-            int conflictCount = 0;
-            int kmerCount = 0;
-            for (var seqEntry : this.sequenceMap.get(repId).entrySet()) {
-                String fid = seqEntry.getKey();
-                KmerSeries kmers = new KmerSeries(seqEntry.getValue(), this.kmerSize);
-                for (String kmer : kmers) {
-                    kmerCount++;
-                    if (commonSet.contains(kmer)) {
-                        // Here the kmer has already been identified as bad.
-                        commonCount++;
-                    } else {
-                        HammerScore score = retVal.get(kmer);
-                        if (score == null) {
-                            // Here the kmer is new.  Add it to the return map.
-                            retVal.put(kmer, new HammerScore(fid, neighbors));
-                        } else if (score.isDisqualifyingHit(fid)) {
-                            // Here the kmer has been seen before in a different genome.
-                            retVal.remove(kmer);
-                            commonSet.add(kmer);
-                            conflictCount++;
+            var repSequenceMap = this.sequenceMap.get(repId);
+            if (repSequenceMap != null) {
+                // Get the neighbor set.  We store it in the score objects.
+                Set<String> neighbors = repEntry.getValue();
+                log.info("Scanning representative genome {} with {} neighbors.", repId, neighbors.size() - 1);
+                // Loop through all the sequences for this representative.  We expect one, maybe two.
+                int commonCount = 0;
+                int conflictCount = 0;
+                int kmerCount = 0;
+                for (var seqEntry : repSequenceMap.entrySet()) {
+                    String fid = seqEntry.getKey();
+                    KmerSeries kmers = new KmerSeries(seqEntry.getValue(), this.kmerSize);
+                    for (String kmer : kmers) {
+                        kmerCount++;
+                        if (commonSet.contains(kmer)) {
+                            // Here the kmer has already been identified as bad.
+                            commonCount++;
+                        } else {
+                            HammerScore score = retVal.get(kmer);
+                            if (score == null) {
+                                // Here the kmer is new.  Add it to the return map.
+                                retVal.put(kmer, new HammerScore(fid, neighbors));
+                            } else if (score.isDisqualifyingHit(fid)) {
+                                // Here the kmer has been seen before in a different genome.
+                                retVal.remove(kmer);
+                                commonSet.add(kmer);
+                                conflictCount++;
+                            }
                         }
                     }
                 }
+                log.info("{} kmers processed:  {} were common, {} conflicts found.", kmerCount, commonCount, conflictCount);
+                // Now delete the sequences for this rep genome.  We don't need them again.
+                this.sequenceMap.remove(repId);
             }
-            log.info("{} kmers processed:  {} were common, {} conflicts found.", kmerCount, commonCount, conflictCount);
-            // Now delete the sequences for this rep genome.  We don't need them again.
-            this.sequenceMap.remove(repId);
         }
         log.info("{} potential kmers found for {}.", retVal.size(), this.roleId);
         return retVal;
@@ -247,7 +251,6 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         int seqCount = 0;
         for (var genomeEntry : this.sequenceMap.entrySet()) {
             String genomeId = genomeEntry.getKey();
-            log.info("Processing sequences for {}.", genomeId);
             for (String seq : genomeEntry.getValue().values()) {
                 KmerSeries kmers = new KmerSeries(seq, this.kmerSize);
                 for (String kmer : kmers) {
@@ -256,7 +259,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                         score.recordHit(genomeId);
                 }
                 seqCount++;
-                if (log.isInfoEnabled() && seqCount % 1000 == 0)
+                if (log.isInfoEnabled() && seqCount % 5000 == 0)
                     log.info("{} sequences processed for role {}.", seqCount, this.roleId);
             }
         }
@@ -271,7 +274,6 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         int worthless = 0;
         int imprecise = 0;
         int kept = 0;
-        writer.println("hammer\tfid\tworthiness\tprecision");
         for (var hammerEntry : this.hammerMap.entrySet()) {
             String hammer = hammerEntry.getKey();
             HammerScore score = hammerEntry.getValue();
@@ -284,7 +286,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             else {
                 kept++;
                 writer.println(hammer + "\t" + score.getFid() + "\t" + Double.toString(worth) + "\t" + Double.toString(prec));
-                if (log.isInfoEnabled() && kept % 5000 == 0)
+                if (log.isInfoEnabled() && kept % 30000 == 0)
                     log.info("{} hammers output, {} unworthy, {} imprecise.", kept, worthless, imprecise);
             }
         }

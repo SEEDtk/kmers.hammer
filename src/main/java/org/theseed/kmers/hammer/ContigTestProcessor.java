@@ -27,7 +27,7 @@ import org.theseed.sequence.Sequence;
 /**
  * This command analyzes a single FASTA file to look for hammer hits.  For each hit, it outputs the contig ID and location,
  * the ID of the feature from which the hammer was harvested, and the contig comment.  This information can be used to
- * determine how good the hits were. *
+ * determine how good the hits were.
  *
  * The positional parameter is the name of the FASTA file.  It is recommended that "genome.bins synth" be used to generate
  * the input file. The command-line options are as follows.

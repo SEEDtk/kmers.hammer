@@ -33,8 +33,9 @@ import org.theseed.utils.ParseFailureException;
  * the ID and role of the source feature for the hammer and the target feature hit (if any).
  *
  * The standard input should contain the result file from the contig test.  The report will be written to the standard
- * output.  The positional parameters are the ID of the genome of interest and the name of the genome source (file or
- * directory) containing all of the genomes processed.  The report will only include hits against the specified genome.
+ * output.  The positional parameters are the ID of the genome of interest, the name of the genome source (file or
+ * directory) containing all of the genomes processed, and the name of the genome source for the representative genomes.
+ * The report will only include hits against the specified genome.
  *
  * The command-line options are as follows:
  *
@@ -43,7 +44,8 @@ import org.theseed.utils.ParseFailureException;
  * -i	name of input file (if not STDIN)
  * -o	name of output file (if not STDOUT)
  *
- * --source		type of genome source (default DIR)
+ * --source		type of test genome source (default DIR)
+ * --repSource	type of representative-genome source (default DIR)
  *
  *
  * @author Bruce Parrello
@@ -54,8 +56,10 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     // FIELDS
     /** logging facility */
     protected static Logger log = LoggerFactory.getLogger(ContigTestLocationProcessor.class);
-    /** genome source */
-    private GenomeSource genomes;
+    /** test genome source */
+    private GenomeSource testGenomes;
+    /** representative genome source */
+    private GenomeSource repGenomes;
     /** target genome */
     private Genome targetGenome;
     /** location finder for target genome */
@@ -81,17 +85,25 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
 
     // COMMAND-LINE OPTIONS
 
-    /** type of genome source (MASTER, CORE, DIR, etc.) */
-    @Option(name = "--source", usage = "type of genome source")
+    /** type of test genome source (MASTER, CORE, DIR, etc.) */
+    @Option(name = "--source", usage = "type of test genome source")
     private GenomeSource.Type sourceType;
+
+    /** type of genome source (MASTER, CORE, DIR, etc.) */
+    @Option(name = "--repSsource", usage = "type of representative genome source")
+    private GenomeSource.Type repSourceType;
 
     /** ID of the genome of interest */
     @Argument(index = 0, metaVar = "genomeID", usage = "ID of the genome whose hammer hits are to be analyzed", required = true)
     private String targetID;
 
-    /** name of the genome source file or directory */
-    @Argument(index = 1, metaVar = "sourceDir", usage = "name of the file or directory containing the genomes needed", required = true)
+    /** name of the test genome source file or directory */
+    @Argument(index = 1, metaVar = "sourceDir", usage = "name of the file or directory containing the test genomes needed", required = true)
     private File sourceDir;
+
+    /** name of the genome source file or directory */
+    @Argument(index = 2, metaVar = "repSourceDir", usage = "name of the file or directory containing the representative genomes needed", required = true)
+    private File repSourceDir;
 
     /**
      * This class tracks data on a single hit.  It is sorted by source hammer genome and feature ID.
@@ -198,24 +210,31 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     @Override
     protected void setPipeDefaults() {
         this.sourceType = GenomeSource.Type.DIR;
+        this.repSourceType = GenomeSource.Type.DIR;
     }
 
     @Override
     protected void validatePipeParms() throws IOException, ParseFailureException {
-        // Set up the genome source.
+        // Set up the test genome source.
         if (! this.sourceDir.exists())
             throw new FileNotFoundException("Genome source " + this.sourceDir + " does not exist.");
-        log.info("Connecting to genome source {} of type {}.", this.sourceDir, this.sourceType);
-        this.genomes = this.sourceType.create(this.sourceDir);
-        if (! this.genomes.getIDs().contains(this.targetID))
+        log.info("Connecting to test genome source {} of type {}.", this.sourceDir, this.sourceType);
+        this.testGenomes = this.sourceType.create(this.sourceDir);
+        if (! this.testGenomes.getIDs().contains(this.targetID))
             throw new ParseFailureException("Target genome " + this.targetID + " not found in genome source " + this.sourceDir);
         // Load the target genome.
         log.info("Loading target genome from {}.", this.sourceDir);
-        this.targetGenome = this.genomes.getGenome(this.targetID);
+        this.targetGenome = this.testGenomes.getGenome(this.targetID);
         this.targetFinder = new LocationFinder(this.targetGenome);
+        // Set up the test genome source.
+        if (! this.repSourceDir.exists())
+            throw new FileNotFoundException("Representative-genome source " + this.repSourceDir + " does not exist.");
+        log.info("Connecting to representative-genome source {} of type {}.", this.repSourceDir, this.repSourceType);
+        this.repGenomes = this.repSourceType.create(this.repSourceDir);
         // Denote we have not loaded the representative genome.
         this.repGenome = null;
         // Compute the position in each hit location string from the input where the real location string begins.
+        // Said real location string begins after the genomeID and a colon.
         this.residualIdx = this.targetID.length() + 1;
         // Initialize the hit tracking.
         this.hitCount = 0;
@@ -250,7 +269,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 this.hitSet.add(hit);
                 // Insure the representative genome is in memory.
                 if (this.repGenome == null) {
-                    this.repGenome = this.genomes.getGenome(repId);
+                    this.repGenome = this.repGenomes.getGenome(repId);
                     log.info("Representative genome {} loaded.", this.repGenome);
                 }
             }
@@ -281,7 +300,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             // Compute the hammer's source feature.  This may require loading a new hammer genome.
             if (! hammerGenomeId.contentEquals(hit.getSourceGenomeId())) {
                 hammerGenomeId = hit.getSourceGenomeId();
-                this.hammerGenome = this.genomes.getGenome(hammerGenomeId);
+                this.hammerGenome = this.testGenomes.getGenome(hammerGenomeId);
                 log.info("Hammer genome {} loaded.", this.hammerGenome);
             }
             if (! hammerFid.contentEquals(hit.getSourceFeatureId())) {
