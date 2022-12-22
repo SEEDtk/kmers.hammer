@@ -52,6 +52,9 @@ public class HashHammerDb extends HammerDb {
      */
     protected class Loader implements HammerDb.ILoader {
 
+        /** estimated hash size */
+        private int estimate;
+
         @Override
         public void updateHammerMap(String fid, String hammer, double worth) {
             HashHammerDb.this.hammerMap.put(hammer, new HammerDb.Source(fid, worth));
@@ -59,14 +62,18 @@ public class HashHammerDb extends HammerDb {
 
         @Override
         public void createEmptyMap(File inFile) {
-            int estimate = (int) (inFile.length() / 30);
+            this.estimate = (int) (inFile.length() / 40);
             log.info("Estimated hash size for {} is {}.", inFile, estimate);
             HashHammerDb.this.hammerMap = new HashMap<String, HammerDb.Source>(estimate);
         }
 
         @Override
         public void close() {
-            // No resources to release
+            if (log.isInfoEnabled()) {
+                double hammerCount = HashHammerDb.this.hammerMap.size();
+                log.info("Final hash metrics are {} hammers with {} capacity.", hammerCount,
+                    this.estimate / hammerCount);
+            }
         }
 
     }

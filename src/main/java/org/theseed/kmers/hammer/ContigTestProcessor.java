@@ -193,7 +193,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
             String seqId = hitLoc.getContigId();
             double worth = hit.getWorthiness();
             String comment = batch.get(seqId).getComment();
-            writer.println(locString + "\t" + hit.getFid() + worth + "\t" + comment);
+            writer.println(locString + "\t" + hit.getFid() + "\t" + worth + "\t" + comment);
             hitCount++;
         }
         writer.flush();
