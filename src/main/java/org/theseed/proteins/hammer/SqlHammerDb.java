@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.theseed.counters.CountMap;
-import org.theseed.genome.Feature;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.DbLoader;
 import org.theseed.java.erdb.DbQuery;
@@ -108,10 +107,11 @@ public class SqlHammerDb extends HammerDb {
         }
 
         @Override
-        public void updateHammerMap(String fid, String hammer) {
+        public void updateHammerMap(String fid, String hammer, double worth) {
             try {
                 this.loader.set("hammer", hammer);
                 this.loader.set("fid", fid);
+                this.loader.set("worth", worth);
                 this.loader.insert();
             } catch (SQLException e) {
                 throw new RuntimeException("SQL Error: " + e.toString());
@@ -201,7 +201,7 @@ public class SqlHammerDb extends HammerDb {
      */
     protected DbQuery buildBatchQuery(int size) throws SQLException {
         DbQuery retVal = new DbQuery(this.db, "Hammer");
-        retVal.select("Hammer", "fid", "hammer");
+        retVal.select("Hammer", "fid", "hammer", "worth");
         retVal.in("Hammer.hammer", size);
         return retVal;
     }
@@ -219,8 +219,9 @@ public class SqlHammerDb extends HammerDb {
         this.setupBatchQuery(query, kmers);
         int count = 0;
         for (DbRecord result : query) {
-            String fid = result.getString("Hammer.fid");
-            gCounts.count(Feature.genomeOf(fid));
+            HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
+                    result.getDouble("Hammer.worth"));
+            gCounts.count(source.getGenomeId());
             count++;
         }
         log.debug("{} kmers queried and {} results found.", kmers.size(), count);
@@ -268,7 +269,7 @@ public class SqlHammerDb extends HammerDb {
                             batchMap.clear();
                         }
                         // Save this kmer in the map.
-                        var hit = new HammerDb.Hit(seqId, len, i, dir, "", kSize);
+                        var hit = new HammerDb.Hit(seqId, len, i, dir, "", kSize, 1.0);
                         List<HammerDb.Hit> hitList = batchMap.computeIfAbsent(dna.substring(i, i + kSize),
                                 x -> new ArrayList<HammerDb.Hit>(5));
                         hitList.add(hit);
@@ -311,9 +312,10 @@ public class SqlHammerDb extends HammerDb {
         int count = 0;
         for (DbRecord result : query) {
             String fid = result.getString("Hammer.fid");
+            double worth = result.getDouble("Hammer.worth");
             // Now we get the hits, update the fids, and add the hits to the output.
             List<HammerDb.Hit> hitList = batchMap.get(result.getString("Hammer.hammer"));
-            hitList.stream().forEach(x -> x.setFid(fid));
+            hitList.stream().forEach(x -> x.setHammerSource(fid, worth));
             collection.addAll(hitList);
             count++;
         }

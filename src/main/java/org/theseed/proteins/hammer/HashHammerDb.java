@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.theseed.counters.CountMap;
-import org.theseed.genome.Feature;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.ParseFailureException;
@@ -25,8 +24,8 @@ import org.theseed.utils.ParseFailureException;
 public class HashHammerDb extends HammerDb {
 
     // FIELDS
-    /** map of hammers to genome IDs */
-    private Map<String, String> hammerMap;
+    /** map of hammers to hammer source data */
+    private Map<String, Source> hammerMap;
 
     /**
      * Construct a hammer database from an input file.  The file must be tab-delimited, with headers,
@@ -54,15 +53,15 @@ public class HashHammerDb extends HammerDb {
     protected class Loader implements HammerDb.ILoader {
 
         @Override
-        public void updateHammerMap(String fid, String hammer) {
-            HashHammerDb.this.hammerMap.put(hammer, fid);
+        public void updateHammerMap(String fid, String hammer, double worth) {
+            HashHammerDb.this.hammerMap.put(hammer, new HammerDb.Source(fid, worth));
         }
 
         @Override
         public void createEmptyMap(File inFile) {
             int estimate = (int) (inFile.length() / 30);
             log.info("Estimated hash size for {} is {}.", inFile, estimate);
-            HashHammerDb.this.hammerMap = new HashMap<String, String>(estimate);
+            HashHammerDb.this.hammerMap = new HashMap<String, HammerDb.Source>(estimate);
         }
 
         @Override
@@ -76,9 +75,10 @@ public class HashHammerDb extends HammerDb {
     protected void findClosestInternal(CountMap<String> map, Collection<Sequence> seqs, final int kSize) {
         Iterable<String> kIter = KmerSeries.init(seqs, kSize);
         for (String kmer : kIter) {
-            String fid = this.hammerMap.get(kmer);
-            if (fid != null)
-                map.count(Feature.genomeOf(fid));
+            HammerDb.Source source = this.hammerMap.get(kmer);
+            if (source != null) {
+                map.count(source.getGenomeId());
+            }
         }
     }
 
@@ -98,10 +98,10 @@ public class HashHammerDb extends HammerDb {
             // We loop through the sequence with a character index, since we need the location of the hit.
             for (int i = 0; i <= n; i++) {
                 String kmer = dna.substring(i, i + kSize);
-                String fid = this.hammerMap.get(kmer);
-                if (fid != null) {
+                HammerDb.Source source = this.hammerMap.get(kmer);
+                if (source != null) {
                     // Here we have a hammer hit.  Form the hit descriptor.
-                    var hit = new HammerDb.Hit(contigId, len, i, dir, fid, kSize);
+                    var hit = new HammerDb.Hit(contigId, len, i, dir, source.getFid(), kSize, source.getWorthiness());
                     collection.add(hit);
                 }
             }

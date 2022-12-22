@@ -78,7 +78,7 @@ public abstract class HammerDb {
          * @param fid		feature ID of the universal protein in the target genome
          * @param hammer	hammer that identifies it
          */
-        public void updateHammerMap(String fid, String hammer) throws SQLException, IOException;
+        public void updateHammerMap(String fid, String hammer, double worth) throws SQLException, IOException;
 
         /**
          * Create an empty hammer map.
@@ -92,6 +92,51 @@ public abstract class HammerDb {
     }
 
     /**
+     * This object describes a hammer's source information.  It includes the source feature ID and the
+     * worthiness.
+     */
+    public static class Source {
+
+        /** source feature for the hammer */
+        private String fid;
+        /** worthiness of the hammer, a ranking from 0 to 1 */
+        private double worthiness;
+
+        /**
+         * Construct a new hammer source descriptor.
+         *
+         * @param fid		source feature ID
+         * @param worth		worthiness of the hammer
+         */
+        public Source(String fid, double worth) {
+            this.fid = fid;
+            this.worthiness = worth;
+        }
+
+        /**
+         * @return the source feature ID
+         */
+        public String getFid() {
+            return this.fid;
+        }
+
+        /**
+         * @return the worthiness ratio
+         */
+        public double getWorthiness() {
+            return this.worthiness;
+        }
+
+        /**
+         * @return the ID of the hammer's source genome
+         */
+        public String getGenomeId() {
+            return Feature.genomeOf(this.fid);
+        }
+
+    }
+
+    /**
      * This object describes a hammer hit.  Hammer hits are sorted by hit location and then feature ID, so they
      * are organized according to the contig hit.
      */
@@ -101,6 +146,8 @@ public abstract class HammerDb {
         private Location loc;
         /** feature ID of the hammer hit */
         private String fid;
+        /** worthiness of the hammer */
+        private double worthiness;
 
         /**
          * Construct a hit descriptor.
@@ -111,9 +158,10 @@ public abstract class HammerDb {
          * @param dir		TRUE if the hit was on the plus strand, else FALSE
          * @param fid		ID of the feature from which the hammer was harvested
          * @param kSize		kmer size of the hammer
+         * @param worth		worthiness of the hammer
          *
          */
-        protected Hit(String contig, int len, int idx, boolean dir, String fid, int kSize) {
+        protected Hit(String contig, int len, int idx, boolean dir, String fid, int kSize, double worth) {
             // We will save the start and end locations of the hit in here.
             int start;
             int end;
@@ -129,6 +177,7 @@ public abstract class HammerDb {
             }
             this.loc = Location.create(contig, start, end);
             this.fid = fid;
+            this.worthiness = worth;
         }
 
         /**
@@ -204,6 +253,24 @@ public abstract class HammerDb {
             return retVal;
         }
 
+        /**
+         * @return the worthiness of the hammer that made the hit
+         */
+        public double getWorthiness() {
+            return this.worthiness;
+        }
+
+        /**
+         * Update the source feature ID and worthiness.
+         *
+         * @param fid2		hammer source feature ID
+         * @param worth		worthiness ratio
+         */
+        public void setHammerSource(String fid2, double worth) {
+            this.fid = fid2;
+            this.worthiness = worth;
+        }
+
     }
 
 
@@ -268,8 +335,9 @@ public abstract class HammerDb {
                             throw new ParseFailureException("Invalid kmer \"" + hammer + "\" in hammer file (bad length).");
                         }
                     }
+                    double worth = line.getDouble(2);
                     // Add this hammer to the map.
-                    loader.updateHammerMap(fid, hammer);
+                    loader.updateHammerMap(fid, hammer, worth);
                     hCount++;
                     // The loads operate at very different speeds.  We update the log once per 5 seconds.
                     if (log.isInfoEnabled() && System.currentTimeMillis() - logPoint >= 5000) {
