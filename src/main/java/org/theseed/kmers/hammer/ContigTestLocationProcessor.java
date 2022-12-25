@@ -70,6 +70,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     private int fidColIdx;
     /** input column index for the expected representative genome ID */
     private int repColIdx;
+    /** input column index for the worthiness score */
+    private int worthColIdx;
     /** current hammer genome */
     private Genome hammerGenome;
     /** expected representative genome */
@@ -114,12 +116,14 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         private Location hitLoc;
         /** sequence of the hammer */
         private String hammerDna;
-        /** feature hit by the hammer */
+        /** features hit by the hammer */
         private Set<Feature> hitFeatures;
         /** genome ID of hammer source */
         private String sourceGenomeId;
         /** feature ID of hammer source */
         private String sourceFeatureId;
+        /** worthiness of the hammer */
+        private double worthiness;
         /** TRUE for a good hit, FALSE for a bad hit */
         private boolean goodHit;
         /** index number of this hit, to guarantee each hit is unique */
@@ -131,13 +135,16 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
          * @param hitLocString	hit location string (excluding genome ID prefix)
          * @param hammerFid		feature ID of the hammer
          * @param repId			expected representative genome ID
+         * @param worth			worthiness of the hit
          */
-        protected HammerHit(String hitLocString, String hammerFid, String repId) {
+        protected HammerHit(String hitLocString, String hammerFid, String repId, double worth) {
             // Parse the hit location.
             this.hitLoc = Location.parseSeedLocation(hitLocString);
             this.hammerDna = ContigTestLocationProcessor.this.targetGenome.getDna(this.hitLoc);
             // Compute the features hit at the location.
             this.hitFeatures = ContigTestLocationProcessor.this.targetFinder.getFeatures(this.hitLoc);
+            // Save the worthiness.
+            this.worthiness = worth;
             // Extract the hammer source genome ID.
             this.sourceGenomeId = Feature.genomeOf(hammerFid);
             this.sourceFeatureId = hammerFid;
@@ -205,6 +212,14 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             return this.hitLoc.getLength();
         }
 
+
+        /**
+         * @return the worthiness
+         */
+        public double getWorthiness() {
+            return this.worthiness;
+        }
+
     }
 
     @Override
@@ -247,6 +262,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         this.hitColIdx = inputStream.findField("location");
         this.fidColIdx = inputStream.findField("hammer_fid");
         this.repColIdx = inputStream.findField("rep_id");
+        this.worthColIdx = inputStream.findField("worth");
     }
 
     @Override
@@ -265,7 +281,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 String hitLocString = hammerHitLocString.substring(this.residualIdx);
                 String hammerFid = line.get(this.fidColIdx);
                 String repId = line.get(this.repColIdx);
-                HammerHit hit = this.new HammerHit(hitLocString, hammerFid, repId);
+                double worth = line.getDouble(this.worthColIdx);
+                HammerHit hit = this.new HammerHit(hitLocString, hammerFid, repId, worth);
                 this.hitSet.add(hit);
                 // Insure the representative genome is in memory.
                 if (this.repGenome == null) {
@@ -281,7 +298,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         log.info("{} total hammer hits kept.", this.hitCount);
         // Now we process the individual hits to produce the output.
         log.info("Writing output.");
-        writer.println("target_fid\ttarget_function\tsim_to_hammer\tsim_to_rep\thammer\thammer_genome\thammer_fid\thammer_function\tgood_hit");
+        writer.println("target_fid\ttarget_function\tsim_to_hammer\tsim_to_rep\thammer\tworth\thammer_genome\thammer_fid\thammer_function\tgood_hit");
         // These will track the current hammer feature and genome.
         String hammerFid = "";
         String hammerGenomeId = "";
@@ -300,7 +317,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             // Compute the hammer's source feature.  This may require loading a new hammer genome.
             if (! hammerGenomeId.contentEquals(hit.getSourceGenomeId())) {
                 hammerGenomeId = hit.getSourceGenomeId();
-                this.hammerGenome = this.testGenomes.getGenome(hammerGenomeId);
+                this.hammerGenome = this.repGenomes.getGenome(hammerGenomeId);
                 log.info("Hammer genome {} loaded.", this.hammerGenome);
             }
             if (! hammerFid.contentEquals(hit.getSourceFeatureId())) {
@@ -320,6 +337,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             }
             // Get the hammer itself.
             String hammerDNA = hit.getHammerDna();
+            double worth = hit.getWorthiness();
             // Determine the type of hit.
             boolean goodHit = hit.isGoodHit();
             if (goodHit)
@@ -327,8 +345,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             else
                 badHits++;
             // Form the string for the trailing columns (which are constant for all the output lines of this hit).
-            String trailer = "\t" + hammerDNA + "\t" + hammerGenomeId + "\t" + hit.getSourceFeatureId() + "\t"
-                    + hammerFunction + "\t" + (hit.isGoodHit() ? "Y" : "");
+            String trailer = "\t" + hammerDNA + "\t" + Double.toString(worth) +  "\t" + hammerGenomeId + "\t" +
+                    hit.getSourceFeatureId() + "\t" + hammerFunction + "\t" + (hit.isGoodHit() ? "Y" : "");
             // Get the features hit.
             var targetFeats = hit.getHitFeatures();
             if (targetFeats.size() == 0) {

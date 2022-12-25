@@ -209,6 +209,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 Set<String> neighbors = repEntry.getValue();
                 log.info("Scanning representative genome {} with {} neighbors.", repId, neighbors.size() - 1);
                 // Loop through all the sequences for this representative.  We expect one, maybe two.
+                // Note that we don't check for ambiguity characters, since the finder is built without them.
                 int commonCount = 0;
                 int conflictCount = 0;
                 int kmerCount = 0;

@@ -44,6 +44,8 @@ import org.theseed.utils.ParseFailureException;
  * close		actual genome is within the maximum good-match distance
  * good			actual genome is the expected genome
  * better		actual genome is closer than the expected genome
+ * near_miss	actual genome is only slightly further than the expected genome
+ * hard_miss	actual genome is much further than the expected genome
  *
  * The command-line options are as follows:
  *
@@ -53,6 +55,7 @@ import org.theseed.utils.ParseFailureException;
  * -o	output file to contain the report (if not STDOUT)
  *
  * --maxDist	maximum distance for an actual hit to be considered a good match
+ * --nearDist	maximum error for a miss to be considered a near-miss
  *
  * @author Bruce Parrello
  *
@@ -85,6 +88,10 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
     @Option(name = "--maxDist", aliases = { "-d" }, metaVar = "0.1", usage = "maximum distance for a match to be considered good")
     private double maxDist;
 
+    /** maximum error for a closest-genome to be considered a near-miss */
+    @Option(name = "--nearDist", aliases = { "-d" }, metaVar = "0.05", usage = "maximum error for a match to be considered a near-miss")
+    private double nearDist;
+
     /** directory of representative genomes */
     @Argument(index = 0, metaVar = "repgenDir", usage = "directory of representative-genome GTOs")
     private File repDir;
@@ -96,13 +103,16 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
     @Override
     protected void setPipeDefaults() {
         this.maxDist = 0.05;
+        this.nearDist = 0.005;
     }
 
     @Override
     protected void validatePipeParms() throws IOException, ParseFailureException {
-        // Verify the distance limit.
+        // Verify the distance limits.
         if (this.maxDist < 0 || this.maxDist >= 1.0)
             throw new ParseFailureException("Maximum good-match distance must be between 0 and 1.");
+        if (this.nearDist < 0 || this.nearDist >= 1.0)
+            throw new ParseFailureException("Maximum near-miss distance must be between 0 and 1.");
         // Set up the rep-genome directory.
         if (! this.repDir.isDirectory())
             throw new FileNotFoundException("Representative-genome GTO directory " + this.repDir + " is not found or invalid.");
@@ -163,10 +173,12 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
         int betterCount = 0;
         // This is the number of test genomes with no hits.
         int noMatchCount = 0;
+        // This is the number of test genomes with a near-miss.
+        int nearMatchCount = 0;
         // This is the number of test genomes with a bad match.
         int badMatchCount = 0;
         // Write the output header.
-        writer.println("test_genome_id\ttest_genome_name\ttotal_hits\tmatch_genome_id\tmatch_hits\tmatch_dist\trep_id\trep_hits\trep_dist\tclose\tgood\tbetter");
+        writer.println("test_genome_id\ttest_genome_name\ttotal_hits\tmatch_genome_id\tmatch_hits\tmatch_dist\trep_id\trep_hits\trep_dist\tclose\tgood\tbetter\tnear_miss\thard_miss");
         // Loop through the test genomes.
         int gCount = 0;
         int gTotal = this.testGenomes.size();
@@ -180,13 +192,15 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
             var best = counters.getBestEntry();
             if (best == null) {
                 // Here there were no hits.  This almost NEVER happens.
-                writer.println(firstFields + "0\t\t\t\t\t\t\t\t\t");
+                writer.println(firstFields + "0\t\t\t\t\t\t\t\t\t\t\t");
                 noMatchCount++;
             } else {
                 // We will store the rating flags here.
                 String closeFlag = "";
                 String goodFlag = "";
                 String betterFlag = "";
+                String nearFlag = "";
+                String badFlag = "";
                 // Get the genome IDs and hit counts.
                 String matchGenomeId = best.getKey();
                 int matchHits = best.getCount();
@@ -217,19 +231,23 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
                     if (repDist >= matchDist) {
                         betterCount++;
                         betterFlag = "Y";
+                    } else if (matchDist - repDist <= this.nearDist) {
+                        nearMatchCount++;
+                        nearFlag = "Y";
                     } else if (closeFlag.isEmpty()) {
                         // We matched the wrong genome and we are not close, so we count this as a hard miss.
                         badMatchCount++;
+                        badFlag = "Y";
                     }
                 }
-                writer.println(firstFields + String.format("\t%d\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+                writer.println(firstFields + String.format("\t%d\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
                         totalHits, matchGenomeId, matchHits, matchDist, repGenomeId, repHits, repDist,
-                        closeFlag, goodFlag, betterFlag));
+                        closeFlag, goodFlag, betterFlag, nearFlag, badFlag));
             }
         }
         // Write the final stats.
-        log.info("{} test genomes processed.  {} good hits, {} close hits, {} better hits, {} with no hits, {} hard misses.",
-                gTotal, goodCount, closeCount, betterCount, noMatchCount, badMatchCount);
+        log.info("{} test genomes processed.  {} good hits, {} close hits, {} better hits, {} with no hits, {} near misses, {} hard misses.",
+                gTotal, goodCount, closeCount, betterCount, noMatchCount, nearMatchCount, badMatchCount);
     }
 
 }
