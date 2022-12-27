@@ -18,7 +18,7 @@ import org.theseed.utils.BaseProcessor;
  *  scanTest	analyze the results of a synthetic hammer test
  *  scanLocs	compare features hit by bad hammer matches in a synthetic test
  *  distTest	compute the ANI distances to the expected and actual choices in a synthetic test
- *  worthFilter	filter a hammer database by worthiness
+ *  testStats	produce statistics for each test/match genome pair in a contig test
  */
 public class App
 {
@@ -34,9 +34,6 @@ public class App
             break;
         case "hammersF" :
             processor = new HammerFinderProcessor();
-            break;
-        case "worthFilter" :
-            processor = new HammerWorthFilterProcessor();
             break;
         case "closest" :
             processor = new FindClosestProcessor();
@@ -64,6 +61,9 @@ public class App
             break;
         case "distTest" :
             processor = new ContigTestDistanceProcessor();
+            break;
+        case "testStats" :
+            processor = new ContigTestStatisticsProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

@@ -94,18 +94,18 @@ class HammerDbTest {
             case "fig|1278308.3.peg.2084" :
                 assertThat(fid, hit.getLoc(), anyOf(equalTo(Location.create("seq2", 30, 11)),
                         equalTo(Location.create("seq2", 31, 12))));
-                assertThat(fid, hit.getWorthiness(), closeTo(0.6, 0.05));
+                assertThat(fid, hit.getStrength(), closeTo(0.6, 0.05));
                 break;
             case "fig|1278308.3.peg.2569" :
                 assertThat(fid, hit.getLoc(), anyOf(equalTo(Location.create("seq2", 49, 68)),
                         equalTo(Location.create("seq1", 129, 110)),
                         equalTo(Location.create("seq2", 50, 69)),
                         equalTo(Location.create("seq2", 51, 70))));
-                assertThat(fid, hit.getWorthiness(), closeTo(0.7, 0.05));
+                assertThat(fid, hit.getStrength(), closeTo(0.7, 0.05));
                 break;
             case "fig|1397.4.peg.5364" :
                 assertThat(fid, hit.getLoc(), equalTo(Location.create("seq4", 42, 61)));
-                assertThat(fid, hit.getWorthiness(), closeTo(0.8, 0.05));
+                assertThat(fid, hit.getStrength(), closeTo(0.8, 0.05));
                 break;
             }
         }

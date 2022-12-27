@@ -107,11 +107,11 @@ public class SqlHammerDb extends HammerDb {
         }
 
         @Override
-        public void updateHammerMap(String fid, String hammer, double worth) {
+        public void updateHammerMap(String fid, String hammer, double str) {
             try {
                 this.loader.set("hammer", hammer);
                 this.loader.set("fid", fid);
-                this.loader.set("worth", worth);
+                this.loader.set("strength", str);
                 this.loader.insert();
             } catch (SQLException e) {
                 throw new RuntimeException("SQL Error: " + e.toString());
@@ -201,7 +201,7 @@ public class SqlHammerDb extends HammerDb {
      */
     protected DbQuery buildBatchQuery(int size) throws SQLException {
         DbQuery retVal = new DbQuery(this.db, "Hammer");
-        retVal.select("Hammer", "fid", "hammer", "worth");
+        retVal.select("Hammer", "fid", "hammer", "strength");
         retVal.in("Hammer.hammer", size);
         return retVal;
     }
@@ -220,7 +220,7 @@ public class SqlHammerDb extends HammerDb {
         int count = 0;
         for (DbRecord result : query) {
             HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
-                    result.getDouble("Hammer.worth"));
+                    result.getDouble("Hammer.strength"));
             gCounts.count(source.getGenomeId());
             count++;
         }
@@ -312,10 +312,10 @@ public class SqlHammerDb extends HammerDb {
         int count = 0;
         for (DbRecord result : query) {
             String fid = result.getString("Hammer.fid");
-            double worth = result.getDouble("Hammer.worth");
+            double strength = result.getDouble("Hammer.strength");
             // Now we get the hits, update the fids, and add the hits to the output.
             List<HammerDb.Hit> hitList = batchMap.get(result.getString("Hammer.hammer"));
-            hitList.stream().forEach(x -> x.setHammerSource(fid, worth));
+            hitList.stream().forEach(x -> x.setHammerSource(fid, strength));
             collection.addAll(hitList);
             count++;
         }

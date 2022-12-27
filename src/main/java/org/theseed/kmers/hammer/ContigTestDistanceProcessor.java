@@ -89,7 +89,7 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
     private double maxDist;
 
     /** maximum error for a closest-genome to be considered a near-miss */
-    @Option(name = "--nearDist", aliases = { "-d" }, metaVar = "0.05", usage = "maximum error for a match to be considered a near-miss")
+    @Option(name = "--nearDist", metaVar = "0.05", usage = "maximum error for a match to be considered a near-miss")
     private double nearDist;
 
     /** directory of representative genomes */
@@ -243,6 +243,7 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
                 writer.println(firstFields + String.format("\t%d\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
                         totalHits, matchGenomeId, matchHits, matchDist, repGenomeId, repHits, repDist,
                         closeFlag, goodFlag, betterFlag, nearFlag, badFlag));
+                writer.flush();
             }
         }
         // Write the final stats.

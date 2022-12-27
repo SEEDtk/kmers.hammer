@@ -137,7 +137,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     @Override
     protected void runPipeline(TabbedLineReader inputStream, PrintWriter writer) throws Exception {
         // Write the output header.
-        writer.println("hammer\tfid\tworthiness\tprecision");
+        writer.println("hammer\tfid\tstrength\tprecision");
         // Now we are ready to begin.  For each role, we load all the sequences into memory, grouped
         // by representative genome.
         var fastaFileMap = this.finder.getFastas();
@@ -278,7 +278,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         for (var hammerEntry : this.hammerMap.entrySet()) {
             String hammer = hammerEntry.getKey();
             HammerScore score = hammerEntry.getValue();
-            double worth = score.getWorthiness();
+            double worth = score.getStrength();
             double prec = score.getPrecision();
             if (worth < this.minWorth)
                 worthless++;
@@ -286,7 +286,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 imprecise++;
             else {
                 kept++;
-                writer.println(hammer + "\t" + score.getFid() + "\t" + Double.toString(worth) + "\t" + Double.toString(prec));
+                writer.println(hammer + "\t" + score.getFid() + "\t" + Double.toString(worth)
+                        + "\t" + Double.toString(prec));
                 if (log.isInfoEnabled() && kept % 30000 == 0)
                     log.info("{} hammers output, {} unworthy, {} imprecise.", kept, worthless, imprecise);
             }

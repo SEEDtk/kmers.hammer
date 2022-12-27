@@ -70,8 +70,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     private int fidColIdx;
     /** input column index for the expected representative genome ID */
     private int repColIdx;
-    /** input column index for the worthiness score */
-    private int worthColIdx;
+    /** input column index for the strength score */
+    private int strengthColIdx;
     /** current hammer genome */
     private Genome hammerGenome;
     /** expected representative genome */
@@ -122,8 +122,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         private String sourceGenomeId;
         /** feature ID of hammer source */
         private String sourceFeatureId;
-        /** worthiness of the hammer */
-        private double worthiness;
+        /** strength of the hammer */
+        private double strength;
         /** TRUE for a good hit, FALSE for a bad hit */
         private boolean goodHit;
         /** index number of this hit, to guarantee each hit is unique */
@@ -135,16 +135,16 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
          * @param hitLocString	hit location string (excluding genome ID prefix)
          * @param hammerFid		feature ID of the hammer
          * @param repId			expected representative genome ID
-         * @param worth			worthiness of the hit
+         * @param strength		strength of the hit
          */
-        protected HammerHit(String hitLocString, String hammerFid, String repId, double worth) {
+        protected HammerHit(String hitLocString, String hammerFid, String repId, double strength) {
             // Parse the hit location.
             this.hitLoc = Location.parseSeedLocation(hitLocString);
             this.hammerDna = ContigTestLocationProcessor.this.targetGenome.getDna(this.hitLoc);
             // Compute the features hit at the location.
             this.hitFeatures = ContigTestLocationProcessor.this.targetFinder.getFeatures(this.hitLoc);
             // Save the worthiness.
-            this.worthiness = worth;
+            this.strength = strength;
             // Extract the hammer source genome ID.
             this.sourceGenomeId = Feature.genomeOf(hammerFid);
             this.sourceFeatureId = hammerFid;
@@ -214,10 +214,10 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
 
 
         /**
-         * @return the worthiness
+         * @return the strength
          */
-        public double getWorthiness() {
-            return this.worthiness;
+        public double getStrength() {
+            return this.strength;
         }
 
     }
@@ -262,7 +262,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         this.hitColIdx = inputStream.findField("location");
         this.fidColIdx = inputStream.findField("hammer_fid");
         this.repColIdx = inputStream.findField("rep_id");
-        this.worthColIdx = inputStream.findField("worth");
+        this.strengthColIdx = inputStream.findField("worth");
     }
 
     @Override
@@ -281,7 +281,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 String hitLocString = hammerHitLocString.substring(this.residualIdx);
                 String hammerFid = line.get(this.fidColIdx);
                 String repId = line.get(this.repColIdx);
-                double worth = line.getDouble(this.worthColIdx);
+                double worth = line.getDouble(this.strengthColIdx);
                 HammerHit hit = this.new HammerHit(hitLocString, hammerFid, repId, worth);
                 this.hitSet.add(hit);
                 // Insure the representative genome is in memory.
@@ -337,7 +337,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
             }
             // Get the hammer itself.
             String hammerDNA = hit.getHammerDna();
-            double worth = hit.getWorthiness();
+            double worth = hit.getStrength();
             // Determine the type of hit.
             boolean goodHit = hit.isGoodHit();
             if (goodHit)

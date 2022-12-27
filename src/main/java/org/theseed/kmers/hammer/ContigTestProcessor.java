@@ -191,7 +191,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
             final Location hitLoc = hit.getLoc();
             String locString = hitLoc.toSeedString();
             String seqId = hitLoc.getContigId();
-            double worth = hit.getWorthiness();
+            double worth = hit.getStrength();
             String comment = batch.get(seqId).getComment();
             writer.println(locString + "\t" + hit.getFid() + "\t" + worth + "\t" + comment);
             hitCount++;

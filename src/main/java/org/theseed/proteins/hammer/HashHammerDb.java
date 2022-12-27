@@ -56,8 +56,8 @@ public class HashHammerDb extends HammerDb {
         private int estimate;
 
         @Override
-        public void updateHammerMap(String fid, String hammer, double worth) {
-            HashHammerDb.this.hammerMap.put(hammer, new HammerDb.Source(fid, worth));
+        public void updateHammerMap(String fid, String hammer, double str) {
+            HashHammerDb.this.hammerMap.put(hammer, new HammerDb.Source(fid, str));
         }
 
         @Override
@@ -108,7 +108,7 @@ public class HashHammerDb extends HammerDb {
                 HammerDb.Source source = this.hammerMap.get(kmer);
                 if (source != null) {
                     // Here we have a hammer hit.  Form the hit descriptor.
-                    var hit = new HammerDb.Hit(contigId, len, i, dir, source.getFid(), kSize, source.getWorthiness());
+                    var hit = new HammerDb.Hit(contigId, len, i, dir, source.getFid(), kSize, source.getStrength());
                     collection.add(hit);
                 }
             }

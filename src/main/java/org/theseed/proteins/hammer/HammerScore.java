@@ -109,6 +109,21 @@ public class HammerScore {
     }
 
     /**
+     * The strength is a measure of our confidence in the hammer.  We start with a fixed value of 1/42
+     * (42 being the mean neighborhood size), then add the fraction of the neighborhood outside the
+     * representative genome hit by the hammer.  The idea is to give extra weight to evidence that the
+     * hammer has worth, without dropping singleton neighborhoods to a weight of 0.
+     *
+     * @return the strength of the hammer
+     */
+    public double getStrength() {
+        double retVal = (1/42);
+        if (this.goodHits > 1)
+            retVal += (this.goodHits - 1) / (double) (this.neighborhood.size() - 1) * (41/42);
+        return retVal;
+    }
+
+    /**
      * @return the hammer's source feature ID
      */
     public String getFid() {
