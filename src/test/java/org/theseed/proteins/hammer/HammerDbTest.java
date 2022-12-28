@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Test;
-import org.theseed.counters.CountMap;
+import org.theseed.counters.WeightMap;
 import org.theseed.genome.Genome;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.sqlite.SqliteDbConnection;
@@ -69,9 +69,9 @@ class HammerDbTest {
             for (Sequence seq : seqsIn)
                 seqs.add(seq);
         }
-        CountMap<String> counts = hammers.findClosest(seqs);
+        WeightMap counts = hammers.findClosest(seqs);
         assertThat(counts.size(), equalTo(3));
-        List<CountMap<String>.Count> results = counts.sortedCounts();
+        List<WeightMap.Count> results = counts.sortedCounts();
         assertThat(results.get(0).getKey(), equalTo("565575.4"));
         assertThat(results.get(1).getKey(), equalTo("1397.4"));
         assertThat(results.get(2).getKey(), equalTo("1278308.3"));

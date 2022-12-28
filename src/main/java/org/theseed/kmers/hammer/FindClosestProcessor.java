@@ -15,7 +15,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.theseed.counters.CountMap;
+import org.theseed.counters.WeightMap;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.SequenceDirectory;
@@ -161,7 +161,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     private void analyzeMember(SequenceDirectory.Member member, PrintWriter writer) {
         log.info("Processing {}: {}.", member.getId(), member.getName());
         Collection<Sequence> seqs = member.getSequences();
-        CountMap<String> closeMap = this.hammers.findClosest(seqs);
+        WeightMap closeMap = this.hammers.findClosest(seqs);
         // We will build our output line in here.
         StringBuffer buffer = new StringBuffer(200);
         buffer.append(member.getId()).append("\t").append(member.getName());
@@ -170,7 +170,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         if (closestList.size() > 2)
             closestList = closestList.subList(0, 2);
         // Display the closest genomes found.
-        for (CountMap<String>.Count counter : closestList)
+        for (WeightMap.Count counter : closestList)
             buffer.append("\t").append(counter.getKey()).append("\t").append(counter.getCount());
         if (closestList.size() < 2) {
             // Here we have a failure condition.

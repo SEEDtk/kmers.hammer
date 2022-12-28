@@ -9,7 +9,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.theseed.counters.CountMap;
+import org.theseed.counters.WeightMap;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.ParseFailureException;
@@ -79,13 +79,12 @@ public class HashHammerDb extends HammerDb {
     }
 
     @Override
-    protected void findClosestInternal(CountMap<String> map, Collection<Sequence> seqs, final int kSize) {
+    protected void findClosestInternal(WeightMap map, Collection<Sequence> seqs, final int kSize) {
         Iterable<String> kIter = KmerSeries.init(seqs, kSize);
         for (String kmer : kIter) {
             HammerDb.Source source = this.hammerMap.get(kmer);
-            if (source != null) {
-                map.count(source.getGenomeId());
-            }
+            if (source != null)
+                this.countHit(map, source);
         }
     }
 

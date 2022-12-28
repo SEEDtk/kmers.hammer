@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.theseed.counters.CountMap;
+import org.theseed.counters.WeightMap;
 import org.theseed.genome.Feature;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.java.erdb.DbConnection;
@@ -42,6 +42,33 @@ public abstract class HammerDb {
     protected static Logger log = LoggerFactory.getLogger(HashHammerDb.class);
     /** kmer size to use */
     private int kmerSize;
+    /** method to use for counting hits */
+    private Method countMethod = Method.STRENGTH;
+
+    /**
+     * This enumeration describes the counting method to be used for finding the closest match.
+     */
+    public static enum Method {
+        STRENGTH {
+            @Override
+            public double getWeight(Source hitSource) {
+                return hitSource.getStrength();
+            }
+        }, COUNT {
+            @Override
+            public double getWeight(Source hitSource) {
+                return 1.0;
+            }
+        };
+
+        /**
+         * @return the weight to use when counting this hammer hit
+         *
+         * @param hitSource		hammer hit source
+         */
+        public abstract double getWeight(Source hitSource);
+
+    }
 
     /**
      * This describes the interface that command processors must support to use the
@@ -360,6 +387,15 @@ public abstract class HammerDb {
     }
 
     /**
+     * Specify the scoring method for counting hits.
+     *
+     * @param method	new method to use
+     */
+    public void setMethod(Method method) {
+        this.countMethod = method;
+    }
+
+    /**
      * The loading object contains resources that have to be freed at the end of loading.
      * It is also
      * @return a loading object
@@ -385,8 +421,8 @@ public abstract class HammerDb {
      *
      * @return a count map detailing the number of hits for each genome
      */
-    public CountMap<String> findClosest(Collection<Sequence> seqs) {
-        var retVal = new CountMap<String>();
+    public WeightMap findClosest(Collection<Sequence> seqs) {
+        var retVal = new WeightMap();
         // Get the reverse complements.
         List<Sequence> seqList = reverseAll(seqs);
         // Add the original sequences.
@@ -423,6 +459,16 @@ public abstract class HammerDb {
     }
 
     /**
+     * Count a hit in a result map.
+     *
+     * @param weightMap		weight map containing the hit score for each genome
+     * @param hitSource		hit to count
+     */
+    protected void countHit(WeightMap weightMap, Source hitSource) {
+        weightMap.count(hitSource.getGenomeId(), this.countMethod.getWeight(hitSource));
+    }
+
+    /**
      * Extract the hammer hits from a collection of sequences.  There is no need to check reverse complements:  this
      * is facilitated by the framework.
      *
@@ -444,6 +490,6 @@ public abstract class HammerDb {
      *
      * @return a count map detailing the number of hits for each genome
      */
-    protected abstract void findClosestInternal(CountMap<String> map, Collection<Sequence> seqs, int kSize);
+    protected abstract void findClosestInternal(WeightMap map, Collection<Sequence> seqs, int kSize);
 
 }

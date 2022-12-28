@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.theseed.counters.CountMap;
+import org.theseed.counters.WeightMap;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.DbLoader;
 import org.theseed.java.erdb.DbQuery;
@@ -147,7 +147,7 @@ public class SqlHammerDb extends HammerDb {
     }
 
     @Override
-    protected void findClosestInternal(CountMap<String> map, Collection<Sequence> seqs, int kSize) {
+    protected void findClosestInternal(WeightMap map, Collection<Sequence> seqs, int kSize) {
         // For performance reason, we batch the kmer queries.  We will collect a batch of
         // kmers, ask for the feature IDs, and count the results.  This gets repeated
         // until we reach the end.
@@ -207,21 +207,21 @@ public class SqlHammerDb extends HammerDb {
     }
 
     /**
-     * Run a database query to find all the genomes for the specified kmers and update the count map.
+     * Run a database query to find all the genomes for the specified kmers and update the score map.
      *
      * @param query		query to fill with parameters and run
      * @param kmers		parameter values to store in the query, indicating the kmers to run
-     * @param gCounts	count map for recording results
+     * @param gCounts	score map for recording results
      *
      * @throws SQLException
      */
-    private void runCountQuery(DbQuery query, Set<String> kmers, CountMap<String> gCounts) throws SQLException {
+    private void runCountQuery(DbQuery query, Set<String> kmers, WeightMap gCounts) throws SQLException {
         this.setupBatchQuery(query, kmers);
         int count = 0;
         for (DbRecord result : query) {
             HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
                     result.getDouble("Hammer.strength"));
-            gCounts.count(source.getGenomeId());
+            this.countHit(gCounts, source);
             count++;
         }
         log.debug("{} kmers queried and {} results found.", kmers.size(), count);
