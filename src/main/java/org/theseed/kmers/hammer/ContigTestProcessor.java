@@ -150,7 +150,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
         this.hitsOut = 0;
         int batchCount = 0;
         // Write the output headers.
-        writer.println("location\thammer_fid\tworth\t" + StringUtils.join(this.headers, '\t'));
+        writer.println("location\thammer_fid\tstrength\t" + StringUtils.join(this.headers, '\t'));
         // Loop through the sequence file.
         try (FastaInputStream inStream = new FastaInputStream(this.inFile)) {
             // Loop through the sequences.
@@ -191,9 +191,9 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
             final Location hitLoc = hit.getLoc();
             String locString = hitLoc.toSeedString();
             String seqId = hitLoc.getContigId();
-            double worth = hit.getStrength();
+            double strength = hit.getStrength();
             String comment = batch.get(seqId).getComment();
-            writer.println(locString + "\t" + hit.getFid() + "\t" + worth + "\t" + comment);
+            writer.println(locString + "\t" + hit.getFid() + "\t" + strength + "\t" + comment);
             hitCount++;
         }
         writer.flush();

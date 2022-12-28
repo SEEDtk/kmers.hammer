@@ -33,6 +33,8 @@ public class HammerScore {
     private int badHits;
     /** total number of genomes in the master database */
     private static int totalGenomes = 0;
+    /** mean neighborhood size */
+    private static double NORMAL_NEIGHBORHOOD = 42.0;
 
     /**
      * Construct a new hammer scoring object.
@@ -117,10 +119,10 @@ public class HammerScore {
      * @return the strength of the hammer
      */
     public double getStrength() {
-        double retVal = (1/42);
+        double retVal = 1.0 / NORMAL_NEIGHBORHOOD;
         if (this.goodHits > 1)
-            retVal += (this.goodHits - 1) / (double) (this.neighborhood.size() - 1) * (41/42);
-        return retVal;
+            retVal += (this.goodHits - 1);
+        return retVal / this.neighborhood.size();
     }
 
     /**
@@ -128,6 +130,13 @@ public class HammerScore {
      */
     public String getFid() {
         return this.fid;
+    }
+
+    /**
+     * @return the number of good hits for this hammer
+     */
+    public int getGoodHits() {
+        return this.goodHits;
     }
 
 }

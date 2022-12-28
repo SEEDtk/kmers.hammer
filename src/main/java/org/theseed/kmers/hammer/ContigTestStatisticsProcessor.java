@@ -39,8 +39,9 @@ import org.theseed.utils.ParseFailureException;
  * The positional parameters are the name of the repgen list file (usually of the form "repXXX.list.tbl"), the name of the
  * actual repgen database file (usually of the form "repXXX.ser"), the name of a genome source for the test genomes, and the
  * name of a file that tells us which matches are good.  This latter file is tab-delimited, and we need the test-genome ID
- * and name (columns "test_genome_id" and "test_genome_name"), the actual match ID ("match_genome_id"), and a flag telling
- * us if the actual match is bad ("hard_miss"). This conforms to the output of ContigTestDistanceProcessor.
+ * and name (columns "test_genome_id" and "test_genome_name"), the actual match ID ("match_genome_id"), a flag telling
+ * us if the actual match is bad ("hard_miss"), and a flag telling us if the strongest match is good ("strength_good"). This
+ * conforms to the output of ContigTestDistanceProcessor.
  *
  * The standard input should contain the output of ContigTestProcessor, which contains details on every single hammer hit from
  * the test.
@@ -155,6 +156,8 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
         private String genomeName;
         /** ID of actual match */
         private String actualId;
+        /** ID of strongest match */
+        private String strongId;
         /** map of match genome IDs to match statistics */
         private Map<String, TestMatchData> matchMap;
         /** error margin between the actual match and the first acceptable match */
@@ -173,6 +176,7 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
             this.genomeName = name;
             this.matchMap = new HashMap<String, TestMatchData>(20);
             this.actualId = "";
+            this.strongId = "";
         }
 
         /**
@@ -211,18 +215,15 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
         }
 
         /**
-         * @return TRUE if the actual match is acceptable, else FALSE
+         * Denote that a particular match is the strongest match.
+         *
+         * @param matchId	ID of the matched genome
          */
-        public boolean isGoodActual() {
-            boolean retVal;
-            // If there is no actual match, we are automatically bad.  Otherwise, we check the match data.
-            if (this.actualId.isEmpty())
-                retVal = false;
-            else {
-                TestMatchData matchData = this.findMatch(this.actualId);
-                retVal = matchData.acceptable;
-            }
-            return retVal;
+        public void setStrongest(String matchId) {
+            // Save the actual-match ID.
+            this.strongId = matchId;
+            // Insure the pairing is set up.
+            this.findMatch(matchId);
         }
 
         /**
@@ -297,7 +298,7 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
         // Verify that we have a real contig-test output file by retrieving the column indices.
         this.locColIdx = inputStream.findField("location");
         this.hammerColIdx = inputStream.findField("hammer_fid");
-        this.strengthColIdx = inputStream.findField("worth");
+        this.strengthColIdx = inputStream.findField("strength");
     }
 
     @Override
@@ -336,21 +337,24 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
         List<TestGenomeData> testCounts = this.testGenomeMap.values().stream().sorted().collect(Collectors.toList());
         // Now we write out all the hit totals.  We write an output line for each matched pair.
         log.info("Writing report.");
-        writer.println("genome_id\tgenome_name\trep_id\thits\tstrength_total\tstrength_mean\tneighborhood\tacceptable\tactual");
+        writer.println("genome_id\tgenome_name\trep_id\thits\tstrength_total\tstrength_mean\tneighborhood\tacceptable\tactual\tstrongest");
         // Loop through the test genomes.
         for (var testGenomeData : testCounts) {
             log.info("Writing counts for {}: {}.", testGenomeData.genomeId, testGenomeData.genomeName);
             // Remember the test genome ID and name.
             String genomeId = testGenomeData.genomeId;
             String genomeName = testGenomeData.genomeName;
-            // Remember the actual match ID.
+            // Remember the actual match ID and the strongest-match ID.
             String actualId = testGenomeData.actualId;
+            String strongId = testGenomeData.strongId;
             // Loop through the match pairs.
             for (var testMatchData : testGenomeData) {
-                // Determine if this is the actual matched genome.
-                String actualFlag = (testMatchData.genomeId.equals(actualId) ? "Y" : "");
+                // Determine if this is the actual matched genome or the strongest-match genome.
+                String actualFlag = (testMatchData.genomeId.equals(actualId) ? "*" : "");
+                String strongFlag = (testMatchData.genomeId.equals(strongId) ? "Y" : "");
                 // Filter detail lines if this is a summary report.
-                if (! this.summaryFlag || ! actualFlag.isEmpty() || testMatchData.acceptable) {
+                if (! this.summaryFlag || ! actualFlag.isEmpty() || testMatchData.acceptable
+                        || ! strongFlag.isEmpty()) {
                     // Determine if the match is acceptable.
                     String goodFlag = (testMatchData.acceptable ? "Y" : "");
                     // Compute the mean worth.
@@ -364,7 +368,8 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
                     writer.println(genomeId + "\t" + genomeName + "\t" + testMatchData.genomeId + "\t"
                                 + Integer.toString(testMatchData.hits) + "\t"
                                 + Double.toString(testMatchData.strengthTotal) + "\t" +  Double.toString(meanStrength)
-                                + "\t" + Integer.toString(neighborCount) + "\t" + goodFlag + "\t" + actualFlag);
+                                + "\t" + Integer.toString(neighborCount) + "\t" + goodFlag + "\t" + actualFlag
+                                + "\t" + strongFlag);
                 }
             }
         }
@@ -389,6 +394,8 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
             int matchCol = inStream.findField("match_genome_id");
             int repCol = inStream.findField("rep_id");
             int missCol = inStream.findField("hard_miss");
+            int strongCol = inStream.findField("strong_genome_id");
+            int strengthFlagCol = inStream.findField("strength_good");
             // Set up some counters.
             int inCount = 0;
             int goodCount = 0;
@@ -404,6 +411,12 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
                 // and that this is the so-called "actual" match.
                 genomeData.addMatch(matchId, ! hardMissFlag);
                 genomeData.setActual(matchId);
+                // Add the strongest-match data.  It is a good match if the strength-good
+                // flag is set.
+                String strongId = line.get(strongCol);
+                boolean strongFlag = line.getFlag(strengthFlagCol);
+                genomeData.addMatch(strongId, strongFlag);
+                genomeData.setStrongest(strongId);
                 // Update the counters.
                 inCount++;
                 if (hardMissFlag) {
