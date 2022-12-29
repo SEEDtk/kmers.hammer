@@ -17,7 +17,6 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.theseed.counters.CountMap;
 import org.theseed.counters.WeightMap;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
@@ -25,6 +24,8 @@ import org.theseed.genome.GenomeDirectory;
 import org.theseed.genome.distance.methods.AniDistanceMethod;
 import org.theseed.genome.distance.methods.Measurer;
 import org.theseed.io.TabbedLineReader;
+import org.theseed.proteins.hammer.HammerDb;
+import org.theseed.proteins.kmers.reps.RepGenomeDb;
 import org.theseed.utils.BasePipeProcessor;
 import org.theseed.utils.ParseFailureException;
 import org.theseed.utils.StringPair;
@@ -32,13 +33,14 @@ import org.theseed.utils.StringPair;
 /**
  * This command analyzes the genome-level results from a hammer test against a synthetic sample (as produced by
  * "ContigTestProcessor").  The expected and actual genomes are computed, then the ANI distance calculated from
- * the test genome to both (or to the actual if they are the same).  We wish two determine (1) the distance range
+ * the test genome to both (or to the actual if they are the same).  We wish to determine (1) the distance range
  * to the actual genomes and (2) whether the actual genome is closer than the expected one.  This tells us how
  * good the hammers are at finding a close genome.
  *
  * The positional parameters are the name of the representative-genome directory (which contains all the genomes
- * that can be picked as expected or actual) and the name of the test-genome directory.  Both of these should be
- * GTO directories with standard naming (that is, the GTO name is the genome ID with an extension of ".gto").
+ * that can be picked as expected or actual), the name of the source representative-genome database, and the name
+ * of the test-genome directory.  Both of these should be GTO directories with standard naming (that is, the GTO
+ * name is the genome ID with an extension of ".gto").
  *
  * The standard input should be the output of the hammer test, and the report will be generated on the standard output.
  *
@@ -48,6 +50,7 @@ import org.theseed.utils.StringPair;
  * good			actual genome is the expected genome
  * better		actual genome is closer than the expected genome
  * near_miss	actual genome is only slightly further than the expected genome
+ * alt_miss		actual genome is a qualified representative of the test genome
  * hard_miss	actual genome is much further than the expected genome
  *
  * The command-line options are as follows:
@@ -57,9 +60,10 @@ import org.theseed.utils.StringPair;
  * -i	input file containing the test results (if not STDIN)
  * -o	output file to contain the report (if not STDOUT)
  *
- * --maxDist	maximum distance for an actual hit to be considered a good match (default 0.05)
- * --nearDist	maximum error for a miss to be considered a near-miss (default 0.005)
+ * --maxDist	maximum distance for an actual hit to be considered a good match (default 0.1)
+ * --nearDist	maximum error for a miss to be considered a near-miss (default 0.01)
  * --cache		name of a file where genome ANI distances will be cached (default "distCache.tbl" in the current directory)
+ * --method		method to use for determining actual hit (default STRENGTH)
  *
  * @author Bruce Parrello
  *
@@ -83,10 +87,8 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
     private int expectColIdx;
     /** input column for hammer strength */
     private int strengthColIdx;
-    /** map of test genome IDs to hit counts */
-    private Map<String, CountMap<String>> hitCountMap;
-    /** map of test genome IDs to strength totals */
-    private Map<String, WeightMap> strengthCountMap;
+    /** map of test genome IDs to score totals */
+    private Map<String, WeightMap> scoreMap;
     /** map of test genome IDs to expected representatives */
     private Map<String, String> expectMap;
     /** cache of genome distances */
@@ -95,6 +97,8 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
     private Measurer testAnalysis;
     /** print writer for the distance cache file */
     private PrintWriter cacheStream;
+    /** representative-genome database */
+    private RepGenomeDb repDb;
 
 
     // COMMAND-LINE OPTIONS
@@ -111,19 +115,31 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
     @Option(name = "--cache", metaVar = "distCache.tbl", usage = "flat file to contain cached genome distances")
     private File cacheFile;
 
+    /** method for scoring hammer hits */
+    @Option(name = "--method", usage = "method to use for scoring hammer hits")
+    private HammerDb.Method scoreMethod;
+
     /** directory of representative genomes */
-    @Argument(index = 0, metaVar = "repgenDir", usage = "directory of representative-genome GTOs")
+    @Argument(index = 0, metaVar = "repgenDir", usage = "directory of representative-genome GTOs",
+            required = true)
     private File repDir;
 
     /** directory of test genomes */
-    @Argument(index = 1, metaVar = "testgenDir", usage = "directory of test genome GTOs")
+    @Argument(index = 1, metaVar = "testgenDir", usage = "directory of test genome GTOs",
+            required = true)
     private File testDir;
+
+    /** original representative-genome database file */
+    @Argument(index = 2, metaVar = "repDb.ser", usage = "representative-genome database file",
+            required = true)
+    private File repDbFile;
 
     @Override
     protected void setPipeDefaults() {
         this.maxDist = 0.05;
-        this.nearDist = 0.005;
+        this.nearDist = 0.01;
         this.cacheFile = new File(System.getProperty("user.dir"), "distCache.tbl");
+        this.scoreMethod = HammerDb.Method.STRENGTH;
     }
 
     @Override
@@ -137,6 +153,10 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
         if (! this.repDir.isDirectory())
             throw new FileNotFoundException("Representative-genome GTO directory " + this.repDir + " is not found or invalid.");
         this.repGenomes = new GenomeDirectory(this.repDir);
+        // Load the rep-genome database.
+        if (! this.repDbFile.canRead())
+            throw new FileNotFoundException("Representative-genome database file " + this.repDbFile + " is not found or unreadable.");
+        this.repDb = RepGenomeDb.load(this.repDbFile);
         // Set up the test-genome directory.
         if (! this.testDir.isDirectory())
             throw new FileNotFoundException("Test-genome GTO directory " + this.testDir + " is not found or invalid.");
@@ -144,10 +164,9 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
         // Initialize the ANI-distance engine with default parameters.
         this.distanceComputer = new AniDistanceMethod();
         this.distanceComputer.parseParmString("");
-        // Create the map from test-genome IDs to hit counts.
+        // Create the map from test-genome IDs to hit scores.
         final int hashSize = this.testGenomes.size() * 4 / 3 + 1;
-        this.hitCountMap = new HashMap<String, CountMap<String>>(hashSize);
-        this.strengthCountMap = new HashMap<String, WeightMap>(hashSize);
+        this.scoreMap = new HashMap<String, WeightMap>(hashSize);
         // Create the map for the expected genomes.
         this.expectMap = new HashMap<String, String>(hashSize);
         // Initialize the distance cache.
@@ -189,28 +208,26 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
             // Get the list of test genomes.
             Set<String> testGenomeIDs = this.testGenomes.getGenomeIDs();
             // Create the count maps.  This insures each test genome has counts, even if it has no hits.
-            for (String testGenomeId : testGenomeIDs) {
-                this.hitCountMap.put(testGenomeId, new CountMap<String>());
-                this.strengthCountMap.put(testGenomeId, new WeightMap());
-            }
+            for (String testGenomeId : testGenomeIDs)
+                this.scoreMap.put(testGenomeId, new WeightMap());
             // First, we scan the input, counting hits.
             log.info("Scanning input file.");
             int inCount = 0;
             for (var line : inputStream) {
                 String testGenomeId = StringUtils.substringBefore(line.get(this.locColIdx), ":");
                 // Verify this line is valid.
-                CountMap<String> counters = this.hitCountMap.get(testGenomeId);
+                WeightMap counters = this.scoreMap.get(testGenomeId);
                 if (counters == null)
                     throw new IOException("Invalid test-genome ID " + testGenomeId + " in input file.");
-                WeightMap strengthCounters = this.strengthCountMap.get(testGenomeId);
-                String hitGenomeId = Feature.genomeOf(line.get(this.hammerColIdx));
+                String hitFid = line.get(this.hammerColIdx);
+                String hitGenomeId = Feature.genomeOf(hitFid);
                 String repId = line.get(this.expectColIdx);
                 double strength = line.getDouble(this.strengthColIdx);
                 // Insure the test genome is associated with its representative.
                 this.expectMap.put(testGenomeId, repId);
                 // Count the hit.
-                counters.count(hitGenomeId);
-                strengthCounters.count(hitGenomeId, strength);
+                HammerDb.Source hitSource = new HammerDb.Source(hitFid, strength);
+                counters.count(hitGenomeId, this.scoreMethod.getWeight(hitSource));
                 inCount++;
                 if (log.isInfoEnabled() && inCount % 5000 == 0)
                     log.info("{} input lines processed.", inCount);
@@ -226,12 +243,12 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
             int noMatchCount = 0;
             // This is the number of test genomes with a near-miss.
             int nearMatchCount = 0;
+            // This is the number of test genomes matching an alternate representative.
+            int altMatchCount = 0;
             // This is the number of test genomes with a bad match.
             int badMatchCount = 0;
-            // This is the number of test genomes that had a good strength-based match.
-            int strongMatchCount = 0;
             // Write the output header.
-            writer.println("test_genome_id\ttest_genome_name\ttotal_hits\tmatch_genome_id\tmatch_hits\tmatch_dist\tstrong_genome_id\tstrength\tstrongest_dist\trep_id\trep_hits\trep_dist\tclose\tgood\tbetter\tnear_miss\thard_miss\tstrength_good");
+            writer.println("test_genome_id\ttest_genome_name\ttotal_hits\tmatch_genome_id\tmatch_hits\tmatch_dist\trep_id\trep_hits\trep_dist\tclose\tgood\tbetter\tnear_miss\talt_miss\thard_miss");
             // Loop through the test genomes.
             int gCount = 0;
             int gTotal = this.testGenomes.size();
@@ -243,29 +260,26 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
                 // Denote we don't have a measurer yet.
                 this.testAnalysis = null;
                 // Get the best match.
-                var counters = this.hitCountMap.get(testGenomeId);
+                var counters = this.scoreMap.get(testGenomeId);
                 var best = counters.getBestEntry();
                 if (best == null) {
                     // Here there were no hits.  This almost NEVER happens.
-                    writer.println(firstFields + "0\t\t\t\t\t\t\t\t\t\t\t\t\t\t");
+                    writer.println(firstFields + "0\t\t\t\t\t\t\t\t\t\t\t\t");
                     noMatchCount++;
                 } else {
-                    // Get the strongest hit.
-                    var strongest = this.strengthCountMap.get(testGenomeId).getBestEntry();
                     // We will store the rating flags here.
                     String closeFlag = "";
                     String goodFlag = "";
                     String betterFlag = "";
                     String nearFlag = "";
                     String badFlag = "";
+                    String altFlag = "";
                     // Get the genome IDs and hit counts.
                     String matchGenomeId = best.getKey();
-                    int matchHits = best.getCount();
+                    double matchHits = best.getCount();
                     String repGenomeId = this.expectMap.get(testGenomeId);
-                    int repHits = counters.getCount(repGenomeId);
-                    int totalHits = counters.getTotal();
-                    String strongGenomeId = strongest.getKey();
-                    double strength = strongest.getCount();
+                    double repHits = counters.getCount(repGenomeId);
+                    double totalHits = counters.sum();
                     // Now compute the distances.
                     double matchDist = this.computeDistance(testGenome, matchGenomeId, "best");
                     if (matchDist <= this.maxDist) {
@@ -280,6 +294,13 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
                         goodCount++;
                         goodFlag = "Y";
                     } else {
+                        // Check the close representatives.
+                        var closeList = this.repDb.findClose(testGenome);
+                        boolean altRep = closeList.stream().anyMatch(x -> x.getGenomeId().contentEquals(matchGenomeId));
+                        if (altRep) {
+                            altFlag = "Y";
+                            altMatchCount++;
+                        }
                         // We need the distance to the expected genome.
                         repDist = this.computeDistance(testGenome, repGenomeId, "expected");
                         if (repDist >= matchDist) {
@@ -288,33 +309,23 @@ public class ContigTestDistanceProcessor extends BasePipeProcessor {
                         } else if (matchDist - repDist <= this.nearDist) {
                             nearMatchCount++;
                             nearFlag = "Y";
-                        } else if (closeFlag.isEmpty()) {
+                        } else if (closeFlag.isEmpty() && altFlag.isEmpty()) {
                             // We matched the wrong genome and we are not close, so we count this as a hard miss.
                             badMatchCount++;
                             badFlag = "Y";
                         }
                     }
-                    // Now check the distance to the strongest genome.  If it is the same as one of the others, then
-                    // the distance will already be in the cache.
-                    double strongDist= this.computeDistance(testGenome, strongGenomeId, "strongest");
-                    // Finally, determine if the strongest match is good.
-                    String strongFlag = "";
-                    if (strongGenomeId.equals(repGenomeId) || strongGenomeId.equals(matchGenomeId) && badFlag.isEmpty()
-                            || strongDist <= repDist + this.nearDist) {
-                        strongFlag = "Y";
-                        strongMatchCount++;
-                    }
-                    writer.println(firstFields + String.format("\t%d\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
-                            totalHits, matchGenomeId, matchHits, matchDist, strongGenomeId, strength, strongDist,
-                            repGenomeId, repHits, repDist,
-                            closeFlag, goodFlag, betterFlag, nearFlag, badFlag, strongFlag));
+                    writer.println(firstFields + "\t" + totalHits + "\t" + matchGenomeId + "\t" + matchHits + "\t"
+                            + matchDist + "\t" + repGenomeId + "\t" + repHits + "\t" + repDist + "\t" +
+                            closeFlag + "\t" + goodFlag + "\t" + betterFlag + "\t" + nearFlag + "\t" +
+                            altFlag + "\t" + badFlag);
                     writer.flush();
                 }
             }
             // Write the final stats.
-            log.info("{} test genomes processed.  {} good hits, {} close hits, {} better hits, {} with no hits, {} near misses, {} hard misses.",
-                    gTotal, goodCount, closeCount, betterCount, noMatchCount, nearMatchCount, badMatchCount);
-            log.info("Strength-based matching worked for {} tests ({}% accuracy).", strongMatchCount, strongMatchCount * 100.0 / gTotal);
+            log.info("{} test genomes processed.  {} good hits, {} close hits, {} better hits, {} with no hits, {} near misses, {} alternate representatives, {} hard misses.",
+                    gTotal, goodCount, closeCount, betterCount, noMatchCount, nearMatchCount, altMatchCount, badMatchCount);
+            log.info("Accuracy is {}.", (gCount - badMatchCount) / (double) gCount);
         } finally {
             // Note that closing the print writer automatically closes the underlying file writer.
             if (this.cacheStream != null)
