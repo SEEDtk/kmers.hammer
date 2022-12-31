@@ -26,6 +26,8 @@ public class HashHammerDb extends HammerDb {
     // FIELDS
     /** map of hammers to hammer source data */
     private Map<String, Source> hammerMap;
+    /** maximum hash size */
+    private static final int MAX_HASH = 0x10000000;
 
     /**
      * Construct a hammer database from an input file.  The file must be tab-delimited, with headers,
@@ -62,9 +64,18 @@ public class HashHammerDb extends HammerDb {
 
         @Override
         public void createEmptyMap(File inFile) {
-            this.estimate = (int) (inFile.length() / 40);
-            log.info("Estimated hash size for {} is {}.", inFile, estimate);
-            HashHammerDb.this.hammerMap = new HashMap<String, HammerDb.Source>(estimate);
+            // We do some fancy math here to insure we have a working hash even if the
+            // number of hammers is insane.  We cap the estimated size around 2^28, and
+            // if the hash is going to be big, we set the load factor to 1 to prevent
+            // splitting.
+            float loadFactor = 0.75f;
+            this.estimate = (int) (inFile.length() / 50);
+            if (this.estimate <= 0 || this.estimate >= MAX_HASH) {
+                this.estimate = MAX_HASH;
+                loadFactor = 1.00f;
+            }
+            log.info("Estimated hash size for {} is {}.", inFile, this.estimate);
+            HashHammerDb.this.hammerMap = new HashMap<String, HammerDb.Source>(estimate, loadFactor);
         }
 
         @Override
