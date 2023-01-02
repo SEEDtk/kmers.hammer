@@ -47,11 +47,13 @@ import org.theseed.java.erdb.DbConnection;
  * -t	hammer type to be used in output headers
  * -b	batch size for queries
  *
- * --hType		type of hammer database
+ * --hType		type of hammer database (default MEMORY)
+ * --method		voting method to use (default COUNT)
  * --file		file containing hammer database (either SQLite database or hammer flat file)
  * --url		URL of database (host and name, MySQL only)
  * --parms		database connection parameter string (MySQL only)
  * --type		database engine type
+ * --para		process the sequences in parallel
  *
  * @author Bruce Parrello
  *
@@ -69,6 +71,8 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     private int memberCount;
     /** number of close-genomes not found */
     private int failureCount;
+    /** process time spent computing closest-genomes */
+    private long processTime;
 
     // COMMAND-LINE OPTIONS
 
@@ -79,6 +83,10 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     /** type of hammer database */
     @Option(name = "--hType", usage = "type of hammer database")
     private HammerDb.Type hammerType;
+
+    /** voting method to use */
+    @Option(name = "--method", usage = "voting method for determining closest genome")
+    private HammerDb.Method methodType;
 
     /** hammer title string */
     @Option(name = "--title", aliases = { "-t" }, metaVar = "hammer100",
@@ -102,6 +110,10 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     @Option(name = "--parms", metaVar="user=xxx&pass=YYY", usage = "database parameter string (for MySQL")
     private String dbParms;
 
+    /** TRUE to turn on parallelization */
+    @Option(name = "--para", usage = "if specified, multiple genomes will be run at the same time")
+    private boolean paraFlag;
+
     /** input directory name */
     @Argument(index = 0, metaVar = "inDir", usage = "input directory containing sequence files", required = true)
     private File inDir;
@@ -114,6 +126,9 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         this.dbUrl = null;
         this.dbParms = null;
         this.batchSize = 4000;
+        this.hammerType = HammerDb.Type.MEMORY;
+        this.methodType = HammerDb.Method.COUNT;
+        this.paraFlag = false;
     }
 
     @Override
@@ -129,6 +144,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         // We must convert SQL exceptions for compatability.
         try {
             this.hammers = this.hammerType.create(this);
+            this.hammers.setMethod(this.methodType);
         } catch (SQLException e) {
             throw new IOException("Database error: " + e.toString());
         }
@@ -139,16 +155,20 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         // Write the output heading.
         writer.format("genome_id\tgenome_name\t%s.DNA.closest_genome1\t%s.DNA.closeness1\t%s.DNA.closest_genome2\t%s.DNA.closeness2%n",
                 this.hammerTitle, this.hammerTitle, this.hammerTitle, this.hammerTitle);
-        // Initialize the member counter.
+        // Initialize the member counter and process time.
         this.memberCount = 0;
+        this.processTime = 0;
         // Process all the members.
-        Stream<SequenceDirectory.Member> inStream = this.members.stream();
+        Stream<SequenceDirectory.Member> inStream = this.members.stream(this.paraFlag);
         long start = System.currentTimeMillis();
         inStream.forEach(x -> this.analyzeMember(x, writer));
         if (log.isInfoEnabled() && this.memberCount > 0) {
             double rate = (System.currentTimeMillis() - start) / (1000.0 * this.memberCount);
             log.info("{} members processed, at {} seconds per member. {} failures.", this.memberCount, rate,
                     this.failureCount);
+            // Compute the actual scan time per member.
+            double scanRate = this.processTime / (this.memberCount * 1000.0);
+            log.info("{} microseconds per genome to scan.", scanRate);
         }
     }
 
@@ -161,7 +181,9 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     private void analyzeMember(SequenceDirectory.Member member, PrintWriter writer) {
         log.info("Processing {}: {}.", member.getId(), member.getName());
         Collection<Sequence> seqs = member.getSequences();
+        long memberTimer = System.nanoTime();
         WeightMap closeMap = this.hammers.findClosest(seqs);
+        memberTimer = System.nanoTime() - memberTimer;
         // We will build our output line in here.
         StringBuffer buffer = new StringBuffer(200);
         buffer.append(member.getId()).append("\t").append(member.getName());
@@ -180,7 +202,7 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
                 buffer.append("\t\t");
         }
         // Now we write this synchronized.
-        this.write(writer, buffer.toString());
+        this.write(writer, buffer.toString(), memberTimer);
     }
 
     /**
@@ -196,10 +218,12 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
      *
      * @param writer		output print writer
      * @param string		data line for the current member
+     * @param memberTimer	nanoseconds spent analyzing the member
      */
-    private synchronized void write(PrintWriter writer, String string) {
+    private synchronized void write(PrintWriter writer, String string, long memberTimer) {
         writer.println(string);
         this.memberCount++;
+        this.processTime += memberTimer;
         log.info("{} of {} members processed. {} failures.", this.memberCount, this.members.size(), this.failureCount);
     }
 

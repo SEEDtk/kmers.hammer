@@ -108,6 +108,8 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
     private final File[] files;
     /** pattern for extracting genome IDs from FASTA labels and comments */
     private static final Pattern GENOME_ID_FINDER = Pattern.compile("\\b(\\d+\\.\\d+)");
+    /** pattern for parsing genome IDs from file names */
+    private static final Pattern GENOME_ID_FILE = Pattern.compile("(\\d+\\.\\d+)\\..+");
 
     /**
      * This class acts as a file name filter for locating the sequence files in the input directory.
@@ -247,6 +249,12 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
                     Matcher m = GENOME_ID_FINDER.matcher(firstLine);
                     if (m.find())
                         id = m.group(1);
+                    else {
+                        // Here we check for a file-name ID.
+                        m = GENOME_ID_FILE.matcher(fileName);
+                        if (m.matches())
+                            id = m.group(1);
+                    }
                 }
                 // Form the member.
                 retVal = new Member(id, fileName, seqs);
@@ -291,6 +299,16 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
      */
     public Stream<Member> stream() {
         return StreamSupport.stream(this.spliterator(), false);
+    }
+
+    /**
+     * This method returns all the members as a stream with optional parallelization.
+     * It provides an easy way to parameterize the parallelism.
+     *
+     * @param para		TRUE to parallelize the stream, else FALSE
+     */
+    public Stream<Member> stream(boolean para) {
+        return StreamSupport.stream(this.spliterator(), para);
     }
 
 }
