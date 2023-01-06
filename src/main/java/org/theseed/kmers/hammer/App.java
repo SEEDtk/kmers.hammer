@@ -19,6 +19,8 @@ import org.theseed.utils.BaseProcessor;
  *  scanLocs	compare features hit by bad hammer matches in a synthetic test
  *  distTest	compute the ANI distances to the expected and actual choices in a synthetic test
  *  testStats	produce statistics for each test/match genome pair in a contig test
+ *  sampReport	produce a bin report for a sample group using hammers
+ *  pseudoBins	produce a simulated bin report from a binned sample group
  */
 public class App
 {
@@ -64,6 +66,12 @@ public class App
             break;
         case "testStats" :
             processor = new ContigTestStatisticsProcessor();
+            break;
+        case "sampReport" :
+            processor = new SampleBinReportProcessor();
+            break;
+        case "pseudoBins" :
+            processor = new PseudoBinReportProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

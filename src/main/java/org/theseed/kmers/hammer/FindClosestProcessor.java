@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.sql.SQLException;
 import java.util.Collection;
 import java.util.stream.Stream;
 
@@ -19,9 +18,8 @@ import org.theseed.counters.WeightMap;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.SequenceDirectory;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.utils.BaseHammerUsageProcessor;
 import org.theseed.utils.ParseFailureException;
-import org.theseed.java.erdb.DbConnection;
 
 /**
  * This method processes all the genomes in a directory and returns the closest genomes using
@@ -58,7 +56,7 @@ import org.theseed.java.erdb.DbConnection;
  * @author Bruce Parrello
  *
  */
-public class FindClosestProcessor extends BaseReportProcessor implements HammerDb.IParms, DbConnection.IParms {
+public class FindClosestProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
@@ -76,39 +74,10 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
 
     // COMMAND-LINE OPTIONS
 
-    /** batch size for database or web queries */
-    @Option(name = "--batch", aliases = { "-b" }, metaVar = "100", usage = "batch size for queries")
-    private int batchSize;
-
-    /** type of hammer database */
-    @Option(name = "--hType", usage = "type of hammer database")
-    private HammerDb.Type hammerType;
-
-    /** voting method to use */
-    @Option(name = "--method", usage = "voting method for determining closest genome")
-    private HammerDb.Method methodType;
-
     /** hammer title string */
     @Option(name = "--title", aliases = { "-t" }, metaVar = "hammer100",
             usage = "hammer type to appear in output file headers")
     private String hammerTitle;
-
-    /** database engine type */
-    @Option(name = "--type", usage = "type of database engine")
-    private DbConnection.Type dbEngine;
-
-    /** name of file containing the database */
-    @Option(name = "--file", aliases = { "--dbFile", "--dbfile" }, metaVar = "sqlite.db",
-            usage = "name of the database file (for SQLITE or flat file)")
-    private File dbFile;
-
-    /** database URL for network-based databases */
-    @Option(name = "--url", metaVar = "localhost/mainDB", usage = "database resource location (for MySQL)")
-    private String dbUrl;
-
-    /** database parameter string */
-    @Option(name = "--parms", metaVar="user=xxx&pass=YYY", usage = "database parameter string (for MySQL")
-    private String dbParms;
 
     /** TRUE to turn on parallelization */
     @Option(name = "--para", usage = "if specified, multiple genomes will be run at the same time")
@@ -119,39 +88,24 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
     private File inDir;
 
     @Override
-    protected void setReporterDefaults() {
+    protected void setHammerDefaults() {
         this.hammerTitle = "hammer";
-        this.dbEngine = DbConnection.Type.SQLITE;
-        this.dbFile = null;
-        this.dbUrl = null;
-        this.dbParms = null;
-        this.batchSize = 4000;
-        this.hammerType = HammerDb.Type.MEMORY;
-        this.methodType = HammerDb.Method.COUNT;
         this.paraFlag = false;
     }
 
     @Override
-    protected void validateReporterParms() throws IOException, ParseFailureException {
+    protected void validateHammerParms() throws IOException, ParseFailureException {
         // Verify that the sequence directory exists.
         if (! this.inDir.isDirectory())
             throw new FileNotFoundException("Input directory " + this.inDir + " is not found or invalid.");
         this.members = new SequenceDirectory(this.inDir);
         log.info("{} members found in {}.", this.members.size(), this.inDir);
-        // Validate the batch size.
-        if (this.batchSize < 1)
-            throw new ParseFailureException("Batch size must be at least 1.");
-        // We must convert SQL exceptions for compatability.
-        try {
-            this.hammers = this.hammerType.create(this);
-            this.hammers.setMethod(this.methodType);
-        } catch (SQLException e) {
-            throw new IOException("Database error: " + e.toString());
-        }
     }
 
     @Override
-    protected void runReporter(PrintWriter writer) throws Exception {
+    protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
+        // Save the hammer database.
+        this.hammers = hammerDb;
         // Write the output heading.
         writer.format("genome_id\tgenome_name\t%s.DNA.closest_genome1\t%s.DNA.closeness1\t%s.DNA.closest_genome2\t%s.DNA.closeness2%n",
                 this.hammerTitle, this.hammerTitle, this.hammerTitle, this.hammerTitle);
@@ -225,37 +179,6 @@ public class FindClosestProcessor extends BaseReportProcessor implements HammerD
         this.memberCount++;
         this.processTime += memberTimer;
         log.info("{} of {} members processed. {} failures.", this.memberCount, this.members.size(), this.failureCount);
-    }
-
-    @Override
-    public File getDbFile() {
-        return this.dbFile;
-    }
-
-    @Override
-    public String getParms() {
-        return this.dbParms;
-    }
-
-    @Override
-    public String getDbUrl() {
-        return this.dbUrl;
-    }
-
-    @Override
-    public DbConnection getConnection()  {
-        DbConnection retVal = null;
-        try {
-            retVal = this.dbEngine.create(this);
-        } catch (SQLException e) {
-            throw new RuntimeException("Error creating database: " + e.toString());
-        }
-        return retVal;
-    }
-
-    @Override
-    public int getBatchSize() {
-        return this.batchSize;
     }
 
 }
