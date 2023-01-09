@@ -21,6 +21,7 @@ import org.theseed.utils.BaseProcessor;
  *  testStats	produce statistics for each test/match genome pair in a contig test
  *  sampReport	produce a bin report for a sample group using hammers
  *  pseudoBins	produce a simulated bin report from a binned sample group
+ *  krakenBins	produce a simulated bin report from kraken output in a sample group
  *  binComp		do a comparison of bin reports
  */
 public class App
@@ -73,6 +74,9 @@ public class App
             break;
         case "pseudoBins" :
             processor = new PseudoBinReportProcessor();
+            break;
+        case "krakenBins" :
+            processor = new KrakenBinReportProcessor();
             break;
         case "binComp" :
             processor = new BinReportCompareProcessor();

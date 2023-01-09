@@ -11,12 +11,11 @@ import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
 import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
 import org.apache.commons.math3.util.ResizableDoubleArray;
@@ -107,7 +106,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         this.spearmanEngine = new SpearmansCorrelation();
         this.pearsonEngine = new PearsonsCorrelation();
         // Write the header line.
-        writer.print("file1\tfile2\tsample_id\tspearman\tpearson\tall_sim");
+        writer.print("file1\tfile2\tsample_id\tspearman\tpearson\tspear_common\tpear_common\tall_sim");
         for (int n : this.nValueList)
             writer.format("\ttop%d_sim", n);
         writer.println();
@@ -115,10 +114,10 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         final int nFiles = this.reportFiles.size();
         this.fileContents = this.reportFiles.stream().map(x -> this.readReport(x)).collect(Collectors.toList());
         // Insure each file has the same list of samples.
-        Set<String> samples = this.fileContents.get(0).keySet();
+        Set<String> samples = new HashSet<String>(this.fileContents.get(0).keySet());
         for (var fileContent : this.fileContents.subList(1, nFiles)) {
             if (! samples.equals(fileContent.keySet()))
-                throw new IOException("All report files must contain the same set of samples.");
+                samples.addAll(fileContent.keySet());
         }
         // Process each sample in each pair of files.
         for (int i1 = 0; i1 < nFiles; i1++) {
@@ -134,11 +133,13 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
                     // Get the weight maps for this sample.
                     WeightMap scores1 = file1Map.get(sampleId);
                     WeightMap scores2 = file2Map.get(sampleId);
-                    // Ask for the metrics on these weight maps.
-                    double[] metrics = this.compareMaps(scores1, scores2);
-                    // Write out the results.
-                    writer.println(file1Name + "\t" + file2Name + "\t" + sampleId + "\t"
-                            + Arrays.stream(metrics).mapToObj(x -> Double.toString(x)).collect(Collectors.joining("\t")));
+                    if (scores1 != null & scores2 != null) {
+                        // Ask for the metrics on these weight maps.
+                        double[] metrics = this.compareMaps(scores1, scores2);
+                        // Write out the results.
+                        writer.println(file1Name + "\t" + file2Name + "\t" + sampleId + "\t"
+                                + Arrays.stream(metrics).mapToObj(x -> Double.toString(x)).collect(Collectors.joining("\t")));
+                    }
                 }
             }
         }
@@ -190,27 +191,38 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         // First we need to compute the correlations.  We use key-sorted counts for this.
         var counts1 = scores1.keyedCounts();
         var counts2 = scores2.keyedCounts();
-        // Do a classic merge to put the counts in a pair of arrays.
+        // Do a classic merge to put the counts in a pair of arrays.  We have one pair for all the groupings, and one
+        // for only common groupings.
         int i1 = 0;
-        var array1 = new ResizableDoubleArray(counts1.size());
         int i2 = 0;
+        var array1 = new ResizableDoubleArray(counts1.size());
         var array2 = new ResizableDoubleArray(counts2.size());
+        var common1 = new ResizableDoubleArray(counts1.size());
+        var common2 = new ResizableDoubleArray(counts2.size());
+        double x1 = 0;
+        double x2 = 0;
         // We stop at the end of the first array, so we can only fall off the end of the second inside the loop.
         while (i1 < counts1.size()) {
             // Compare the left and right keys.  If there is no right key, the left key is less (negative).
             int comparison = (i2 >= counts2.size() ? -1 : counts1.get(i1).getKey().compareTo(counts2.get(i2).getKey()));
             if (comparison <= 0) {
-                array1.addElement(counts1.get(i1).getCount());
+                x1 = counts1.get(i1).getCount();
+                array1.addElement(x1);
                 i1++;
             } else
                 array1.addElement(0.0);
             if (comparison >= 0) {
-                array2.addElement(counts2.get(i2).getCount());
+                x2 = counts2.get(i2).getCount();
+                array2.addElement(x2);
                 i2++;
             } else
                 array2.addElement(0.0);
+            if (comparison == 0) {
+                common1.addElement(x1);
+                common2.addElement(x2);
+            }
         }
-        // Here there might be leftovers on the right.
+        // Here there might be leftovers on the right.  Note this doesn't matter to the common arrays.
         while (i2 < counts2.size()) {
             array1.addElement(0.0);
             array2.addElement(counts2.get(i2).getCount());
@@ -221,16 +233,20 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         // Now we have two parallel arrays, each containing a position for every single representative in either map.
         // The size of either array is the denominator for the all-similarity metric.  Allocate an array for the
         // output metrics.
-        double[] retVal = new double[3 + this.nValueList.size()];
+        double[] retVal = new double[5 + this.nValueList.size()];
         retVal[0] = this.spearmanEngine.correlation(double1, double2);
         retVal[1] = this.pearsonEngine.correlation(double1, double2);
+        // Now we want to do the same thing, but restrict ourselves to only the common groupings.
+        double1 = common1.getElements();
+        double2 = common2.getElements();
+        retVal[2] = this.spearmanEngine.correlation(double1, double2);
+        retVal[3] = this.pearsonEngine.correlation(double1, double2);
         // Compute the all-similarity ratio.
-        retVal[2] = IntStream.range(0, double1.length).filter(i -> double1[i] > 0.0 && double2[i] > 0.0).count()
-                / (double) double1.length;
+        retVal[4] = common1.getNumElements() / (double) array1.getNumElements();
         // Now we re-sort the counts and compute the top-N sims.  The default sort for counts is by highest-to-lowest score.
         Collections.sort(counts1);
         Collections.sort(counts2);
-        int idx = 3;
+        int idx = 5;
         for (int nVal : this.nValueList) {
             if (counts1.size() >= nVal && counts2.size() >= nVal) {
                 // Here both score lists have enough members to do a comparison.  Note that this also means both key
