@@ -34,7 +34,7 @@ import org.theseed.utils.ParseFailureException;
  * This command compares bin reports.  We will load each report into a weight map and compare the weight maps on a sample-by
  * sample basis.  Given a sample and two reports, we first do spearman and pearson correlations.  Then, we do a top-N comparison
  * for various values of N.  The comparison will only be performed if both maps have at least N groupings present, and will
- * essentially be a Jaccard similarity-- size of intersection over size of union.
+ * essentially be a similarity ratio-- number of groupings in common over size of set.
  *
  * The positional parameters are the names of the bin report files to compare.
  *
@@ -103,6 +103,9 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
 
     @Override
     protected void runReporter(PrintWriter writer) throws Exception {
+        // Create the correlation engines.
+        this.spearmanEngine = new SpearmansCorrelation();
+        this.pearsonEngine = new PearsonsCorrelation();
         // Write the header line.
         writer.print("file1\tfile2\tsample_id\tspearman\tpearson\tall_sim");
         for (int n : this.nValueList)
@@ -235,7 +238,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
                 Set<String> keys1 = counts1.subList(0, nVal).stream().map(x -> x.getKey()).collect(Collectors.toSet());
                 Set<String> keys2 = counts2.subList(0, nVal).stream().map(x -> x.getKey()).collect(Collectors.toSet());
                 long common = keys1.stream().filter(x -> keys2.contains(x)).count();
-                retVal[idx] = common / (double) (nVal * 2 - common);
+                retVal[idx] = common / (double) nVal;
             }
             idx++;
         }
