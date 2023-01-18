@@ -8,13 +8,16 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.counters.WeightMap;
+import org.theseed.genome.Contig;
 import org.theseed.genome.Feature;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.java.erdb.DbConnection;
@@ -43,7 +46,7 @@ public abstract class HammerDb {
     /** kmer size to use */
     private int kmerSize;
     /** method to use for counting hits */
-    private Method countMethod = Method.STRENGTH;
+    private Method countMethod = Method.COUNT;
 
     /**
      * This enumeration describes the counting method to be used for finding the closest match.
@@ -311,10 +314,20 @@ public abstract class HammerDb {
             public HammerDb create(IParms processor) throws ParseFailureException, IOException {
                 return new HashHammerDb(processor);
             }
+
+            @Override
+            public boolean isLoadFileKnown() {
+                return true;
+            }
         }, ERDB {
             @Override
             public HammerDb create(IParms processor) {
                 return new SqlHammerDb(processor);
+            }
+
+            @Override
+            public boolean isLoadFileKnown() {
+                return false;
             }
         };
 
@@ -328,6 +341,11 @@ public abstract class HammerDb {
          * @throws SQLException
          */
         public abstract HammerDb create(IParms processor) throws IOException, ParseFailureException, SQLException;
+
+        /**
+         * @return TRUE if this database type supports the get-load-file function
+         */
+        public abstract boolean isLoadFileKnown();
     }
 
     /**
@@ -459,13 +477,36 @@ public abstract class HammerDb {
     }
 
     /**
+     * @return the set of hammers found in a sequence
+     *
+     * @param seq	sequence to search
+     */
+    public Set<String> findHammers(String seq) {
+        var retVal = new HashSet<String>(100);
+        this.findHammersInternal(retVal, seq, this.kmerSize);
+        String rSeq = Contig.reverse(seq);
+        this.findHammersInternal(retVal, rSeq, this.kmerSize);
+        return retVal;
+    }
+
+    /**
+     * Find all the hammers in the specified single-strand sequence and add them to the specified output set.
+     *
+     * @param hammerSet		output set for hammers found
+     * @param seq			sequence to search
+     * @param kSize			kmer size to use
+     */
+    protected abstract void findHammersInternal(HashSet<String> hammerSet, String seq, int kSize);
+
+    /**
      * Count a hit in a result map.
      *
      * @param weightMap		weight map containing the hit score for each genome
      * @param hitSource		hit to count
+     * @param count			number of times to count the hit
      */
-    protected void countHit(WeightMap weightMap, Source hitSource) {
-        weightMap.count(hitSource.getGenomeId(), this.countMethod.getWeight(hitSource));
+    protected void countHit(WeightMap weightMap, Source hitSource, int count) {
+        weightMap.count(hitSource.getGenomeId(), this.countMethod.getWeight(hitSource) * count);
     }
 
     /**
@@ -491,5 +532,10 @@ public abstract class HammerDb {
      * @return a count map detailing the number of hits for each genome
      */
     protected abstract void findClosestInternal(WeightMap map, Collection<Sequence> seqs, int kSize);
+
+    /**
+     * @return the name of the hammer load file, or NULL if it is not available
+     */
+    public abstract File getLoadFile();
 
 }

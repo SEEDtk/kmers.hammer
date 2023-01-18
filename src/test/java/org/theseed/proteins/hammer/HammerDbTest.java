@@ -38,6 +38,7 @@ class HammerDbTest {
     void testHashHammerDb() throws IOException, ParseFailureException {
         HashHammerDb hammers = new HashHammerDb(LOAD_FILE);
         hammerDbTester(hammers);
+        assertThat(hammers.getLoadFile(), equalTo(LOAD_FILE));
     }
 
     @Test
@@ -55,8 +56,7 @@ class HammerDbTest {
     }
 
     /**
-     * This tests a hammer database.  The database must be loaded before calling from
-     * hammers200.tbl.
+     * This tests a hammer database.  The database must be loaded from hammers200.tbl before calling.
      *
      * @param hammers	loaded hammer database
      *

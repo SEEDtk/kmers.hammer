@@ -47,8 +47,9 @@ import org.theseed.utils.ParseFailureException;
  * -o	output file for the hammer list (if not STDOUT)
  * -K	kmer size for a hammer (default 20)
  *
- * --minWorth	minimum worthiness fraction for an acceptable hammer (default 0.50)
+ * --minWorth	minimum worthiness fraction for an acceptable hammer (default 0.00)
  * --minPrec	minimum precision fraction for an acceptable hammer (default 0.90)
+ * --minSize	minimum size for a neighborhood to be hammer-worthy (default 1)
  * --temp		name of a temporary directory for working files (default "Temp" in the current directory)
  *
  * @author Bruce Parrello
@@ -79,12 +80,16 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     private int kmerSize;
 
     /** minimum worthiness fraction for an acceptable hammer */
-    @Option(name = "--minWorth", metaVar = "0.80", usage = "minimum worthiness fraction for an acceptable hammer")
+    @Option(name = "--minWorth", metaVar = "0.95", usage = "minimum worthiness fraction for an acceptable hammer")
     private double minWorth;
 
     /** minimum precision fraction for an acceptable hammer */
-    @Option(name = "--minPrec", metaVar = "0.75", usage = "minimum precision fraction for an acceptable hammer")
+    @Option(name = "--minPrec", metaVar = "1.0", usage = "minimum precision fraction for an acceptable hammer")
     private double minPrec;
+
+    /** minimum size of a neighborhood for hammers to be worthwhile */
+    @Option(name = "--minSize", metaVar = "50", usage = "minimum neighborhood size for a representative")
+    private int minPeers;
 
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
@@ -95,7 +100,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     protected void setPipeDefaults() {
         this.kmerSize = 20;
         this.minPrec = 0.9;
-        this.minWorth = 0.5;
+        this.minWorth = 0.0;
+        this.minPeers = 1;
     }
 
     @Override
@@ -108,6 +114,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             throw new ParseFailureException("Minimum worthiness must be between 0 and 1.");
         if (! this.finderDir.isDirectory())
             throw new FileNotFoundException("Finder directory " + this.finderDir + " is not found or invalid.");
+        if (this.minPeers <= 0)
+            throw new ParseFailureException("Minimum neighborhood size must be positive.");
         log.info("Loading protein-finder from {}.", this.finderDir);
         this.finder = new ProteinFinder(this.finderDir);
     }
@@ -275,25 +283,34 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         int worthless = 0;
         int imprecise = 0;
         int kept = 0;
+        int lowSize = 0;
         for (var hammerEntry : this.hammerMap.entrySet()) {
             String hammer = hammerEntry.getKey();
             HammerScore score = hammerEntry.getValue();
-            double worth = score.getWorthiness();
-            double strength = score.getStrength();
-            double prec = score.getPrecision();
-            if (worth < this.minWorth)
-                worthless++;
-            else if (prec < this.minPrec)
-                imprecise++;
+            String fid = score.getFid();
+            String genomeId = Feature.genomeOf(fid);
+            // We must insure the representative has a good neighborhood.
+            if (this.neighborMap.get(genomeId).size() < this.minPeers)
+                lowSize++;
             else {
-                kept++;
-                writer.println(hammer + "\t" + score.getFid() + "\t" + Double.toString(strength)
-                        + "\t" + Double.toString(prec) + "\t" + Integer.toString(score.getGoodHits()));
-                if (log.isInfoEnabled() && kept % 30000 == 0)
-                    log.info("{} hammers output, {} unworthy, {} imprecise.", kept, worthless, imprecise);
+                double worth = score.getWorthiness();
+                double strength = score.getStrength();
+                double prec = score.getPrecision();
+                if (worth < this.minWorth)
+                    worthless++;
+                else if (prec < this.minPrec)
+                    imprecise++;
+                else {
+                    kept++;
+                    writer.println(hammer + "\t" + score.getFid() + "\t" + Double.toString(strength)
+                            + "\t" + Double.toString(prec) + "\t" + Integer.toString(score.getGoodHits()));
+                    if (log.isInfoEnabled() && kept % 30000 == 0)
+                        log.info("{} hammers output, {} unworthy, {} imprecise.", kept, worthless, imprecise);
+                }
             }
         }
-        log.info("{} hammers output, {} unworthy, {} imprecise.", kept, worthless, imprecise);
+        log.info("{} hammers output, {} unworthy, {} imprecise, {} rejected for insufficient neighborhood.",
+                kept, worthless, imprecise, lowSize);
     }
 
 }

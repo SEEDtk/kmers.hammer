@@ -4,10 +4,11 @@
 package org.theseed.kmers.hammer;
 
 import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,13 +17,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.util.ResizableDoubleArray;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.counters.Shuffler;
 import org.theseed.counters.WeightMap;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.utils.BaseReportProcessor;
@@ -35,7 +41,8 @@ import org.theseed.utils.ParseFailureException;
  * for various values of N.  The comparison will only be performed if both maps have at least N groupings present, and will
  * essentially be a similarity ratio-- number of groupings in common over size of set.
  *
- * The positional parameters are the names of the bin report files to compare.
+ * The positional parameters are the names of the bin report files to compare.  A parameter that is a directory will be
+ * searched for files with names that match "binReport.*.tbl".
  *
  * The command-line options are as follows:
  *
@@ -61,6 +68,15 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
     private IntegerList nValueList;
     /** list of (sampleId -> weightMap) maps for each file */
     private List<Map<String, WeightMap>> fileContents;
+    /** list of all files to process */
+    private List<File> reportFiles;
+    /** file filter for report files in a directory */
+    private FilenameFilter BIN_REPORT_FILTER = new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+            return StringUtils.startsWith(name, "binReport.") && StringUtils.endsWith(name, ".tbl");
+        }
+    };
 
     // COMMAND-LINE OPTIONS
 
@@ -70,7 +86,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
 
     /** file names of bin reports to compare */
     @Argument(index = 0, metaVar = "file1.tbl file2.tbl ...", usage = "file name(s) of bin report(s) to compare", required = true)
-    private List<File> reportFiles;
+    private List<File> inFiles;
 
     @Override
     protected void setReporterDefaults() {
@@ -91,10 +107,22 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         }
         if (this.nValueList.size() < 1)
             throw new ParseFailureException("Must be at least one value in N-value list.");
-        // Now check all the bin reports.
-        for (File reportFile : this.reportFiles) {
-            if (! reportFile.canRead())
-                throw new FileNotFoundException("Input file " + reportFile + " is not found or unreadable.");
+        // Now check all the bin report files.
+        this.reportFiles = new ArrayList<File>();
+        for (File inFile : this.inFiles) {
+            if (inFile.isDirectory()) {
+                // Here we need all the files in the directory.
+                File[] dirFiles = inFile.listFiles(BIN_REPORT_FILTER);
+                for (File dirFile : dirFiles) {
+                    if (dirFile.canRead())
+                        this.reportFiles.add(dirFile);
+                    else
+                        log.warn("File {} in directory {} is unreadable.", dirFile, inFile);
+                }
+            } else if (inFile.canRead())
+                this.reportFiles.add(inFile);
+            else
+                log.warn("Parameter file {} is unreadable.", inFile);
         }
         if (this.reportFiles.size() < 2)
             throw new ParseFailureException("Must be at least 2 input files specified.");
@@ -106,10 +134,15 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         this.spearmanEngine = new SpearmansCorrelation();
         this.pearsonEngine = new PearsonsCorrelation();
         // Write the header line.
-        writer.print("file1\tfile2\tsample_id\tspearman\tpearson\tspear_common\tpear_common\tall_sim");
+        var headers = new Shuffler<String>(this.nValueList.size() + 10);
+        headers.add1("file1").add1("file2").add1("sample_id")
+                .add1("spearman").add1("pearson").add1("spearman_common")
+                .add1("pearson_common").add1("all_sim");
         for (int n : this.nValueList)
-            writer.format("\ttop%d_sim", n);
-        writer.println();
+            headers.add1(String.format("top%d_sim", n));
+        writer.println(StringUtils.join(headers, '\t'));
+        // Memorize the number of metrics output for each sample/file-pair combo.
+        final int metricN = headers.size() - 3;
         // Create the list of file-content maps.
         final int nFiles = this.reportFiles.size();
         this.fileContents = this.reportFiles.stream().map(x -> this.readReport(x)).collect(Collectors.toList());
@@ -127,6 +160,9 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
                 var file2Map = this.fileContents.get(i2);
                 String file1Name = this.reportFiles.get(i1).getName();
                 String file2Name = this.reportFiles.get(i2).getName();
+                // We will summarize the results in here.
+                DescriptiveStatistics[] stats = IntStream.range(0, metricN).mapToObj(i -> new DescriptiveStatistics())
+                        .toArray(DescriptiveStatistics[]::new);
                 // Loop through the samples.
                 for (String sampleId : samples) {
                     log.info("Comparing files {} and {} for {}.", file1Name, file2Name, sampleId);
@@ -138,9 +174,19 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
                         double[] metrics = this.compareMaps(scores1, scores2);
                         // Write out the results.
                         writer.println(file1Name + "\t" + file2Name + "\t" + sampleId + "\t"
-                                + Arrays.stream(metrics).mapToObj(x -> Double.toString(x)).collect(Collectors.joining("\t")));
+                                + Arrays.stream(metrics).mapToObj(x -> Double.isNaN(x) ? "" : Double.toString(x))
+                                        .collect(Collectors.joining("\t")));
+                        // Accumulate the results.
+                        for (int i = 0; i < metricN; i++) {
+                            if (Double.isFinite(metrics[i]))
+                                stats[i].addValue(metrics[i]);
+                        }
                     }
                 }
+                // Now write out the summary.
+                writer.println(file1Name + "\t" + file2Name + "\t" + "<average>" + "\t"
+                        + Arrays.stream(stats).map(x -> x.getN() == 0 ? "" : Double.toString(x.getMean()))
+                                .collect(Collectors.joining("\t")));
             }
         }
     }
@@ -234,13 +280,21 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         // The size of either array is the denominator for the all-similarity metric.  Allocate an array for the
         // output metrics.
         double[] retVal = new double[5 + this.nValueList.size()];
+        Arrays.fill(retVal, Double.NaN);
         retVal[0] = this.spearmanEngine.correlation(double1, double2);
         retVal[1] = this.pearsonEngine.correlation(double1, double2);
-        // Now we want to do the same thing, but restrict ourselves to only the common groupings.
-        double1 = common1.getElements();
-        double2 = common2.getElements();
-        retVal[2] = this.spearmanEngine.correlation(double1, double2);
-        retVal[3] = this.pearsonEngine.correlation(double1, double2);
+        // Now we want to do the same thing, but restrict ourselves to only the common groupings.  We only do this if there
+        // are any common groupings.
+        if (common1.getNumElements() > 1) {
+            double1 = common1.getElements();
+            double2 = common2.getElements();
+            retVal[2] = this.spearmanEngine.correlation(double1, double2);
+            retVal[3] = this.pearsonEngine.correlation(double1, double2);
+        } else if (common1.getNumElements() == 1) {
+            retVal[2] = 1.0;
+            retVal[3] = 1.0;
+        }
+
         // Compute the all-similarity ratio.
         retVal[4] = common1.getNumElements() / (double) array1.getNumElements();
         // Now we re-sort the counts and compute the top-N sims.  The default sort for counts is by highest-to-lowest score.

@@ -127,6 +127,20 @@ public abstract class BaseHammerUsageProcessor extends BaseReportProcessor imple
      */
     protected abstract void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception;
 
+    /**
+     * @return TRUE if the hammer database knows its load file name
+     */
+    public boolean isLoadFileKnown() {
+        return this.hammerType.isLoadFileKnown();
+    }
+
+    /**
+     * @return the name of the load file, or NULL if it is unknown
+     */
+    public File getLoadFileName() {
+        return this.hammers.getLoadFile();
+    }
+
     @Override
     public File getDbFile() {
         return this.dbFile;

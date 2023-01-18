@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.theseed.counters.CountMap;
 import org.theseed.counters.WeightMap;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.DbLoader;
@@ -156,19 +157,19 @@ public class SqlHammerDb extends HammerDb {
             Iterable<String> kIter = KmerSeries.init(seqs, kSize);
             log.debug("Iterating through {} sequences.", seqs.size());
             // This will hold the current kmer batch.
-            Set<String> kmers = new HashSet<String>(this.hashSize);
+            var kmers = new CountMap<String>();
             // Create a query.
             DbQuery query = null;
             try {
                  query = this.buildBatchQuery(this.batchSize);
                 // Loop through the kmers, building a batch.
                 for (String kmer : kIter) {
-                    kmers.add(kmer);
+                    kmers.count(kmer);
                     if (kmers.size() == this.batchSize) {
                         // Now we run the query.
                         this.runCountQuery(query, kmers, map);
                         // Clear the kmer set for the next query.
-                        kmers.clear();
+                        kmers.deleteAll();
                     }
                 }
             } finally {
@@ -176,7 +177,7 @@ public class SqlHammerDb extends HammerDb {
                     query.close();
             }
             // Do we have a residual?
-            if (! kmers.isEmpty()) {
+            if (kmers.size() > 0) {
                 // Yes.  Create a mini-query for it.
                 query = null;
                 try {
@@ -193,7 +194,7 @@ public class SqlHammerDb extends HammerDb {
     }
 
     /**
-     * @return a batch hammer query
+     * @return a batch hammer query for counts and hits
      *
      * @param size	number of kmers to be passed in
      *
@@ -207,6 +208,20 @@ public class SqlHammerDb extends HammerDb {
     }
 
     /**
+     * @return a batch hammer query for presence only
+     *
+     * @param size	number of kmers to be passed in
+     *
+     * @throws SQLException
+     */
+    protected DbQuery buildBatchSetQuery(int size) throws SQLException {
+        DbQuery retVal = new DbQuery(this.db, "Hammer");
+        retVal.select("Hammer", "hammer");
+        retVal.in("Hammer.hammer", size);
+        return retVal;
+    }
+
+    /**
      * Run a database query to find all the genomes for the specified kmers and update the score map.
      *
      * @param query		query to fill with parameters and run
@@ -215,13 +230,14 @@ public class SqlHammerDb extends HammerDb {
      *
      * @throws SQLException
      */
-    private void runCountQuery(DbQuery query, Set<String> kmers, WeightMap gCounts) throws SQLException {
-        this.setupBatchQuery(query, kmers);
+    private void runCountQuery(DbQuery query, CountMap<String> kmers, WeightMap gCounts) throws SQLException {
+        this.setupBatchQuery(query, kmers.keys());
         int count = 0;
         for (DbRecord result : query) {
             HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
                     result.getDouble("Hammer.strength"));
-            this.countHit(gCounts, source);
+            String hammer = result.getString("Hammer.hammer");
+            this.countHit(gCounts, source, kmers.getCount(hammer));
             count++;
         }
         log.debug("{} kmers queried and {} results found.", kmers.size(), count);
@@ -320,6 +336,78 @@ public class SqlHammerDb extends HammerDb {
             count++;
         }
         log.info("{} kmers queried, {} were hammers.", batchMap.size(), count);
+    }
+
+    @Override
+    public File getLoadFile() {
+        // The load file is not available for this type of hammer database.
+        return null;
+    }
+
+    @Override
+    protected void findHammersInternal(HashSet<String> hammerSet, String seq, int kSize) {
+        // For performance reason, we batch the kmer queries.  We will collect a batch of
+        // kmers, ask for the feature IDs, and count the results.  This gets repeated
+        // until we reach the end.
+        try {
+            // Get an iterator for the kmers.
+            SequenceKmerIterable kIter = new SequenceKmerIterable(seq, kSize);
+            // This will hold the current kmer batch.
+            var kmers = new HashSet<String>(this.hashSize);
+            // Create a query.
+            DbQuery query = null;
+            try {
+                 query = this.buildBatchSetQuery(this.batchSize);
+                // Loop through the kmers, building a batch.
+                for (String kmer : kIter) {
+                    kmers.add(kmer);
+                    if (kmers.size() == this.batchSize) {
+                        // Now we run the query.
+                        this.runHammerQuery(query, kmers, hammerSet);
+                        // Clear the kmer set for the next query.
+                        kmers.clear();
+                    }
+                }
+            } finally {
+                if (query != null)
+                    query.close();
+            }
+            // Do we have a residual?
+            if (kmers.size() > 0) {
+                // Yes.  Create a mini-query for it.
+                query = null;
+                try {
+                    query = this.buildBatchSetQuery(kmers.size());
+                    this.runHammerQuery(query, kmers, hammerSet);
+                } finally {
+                    if (query != null)
+                        query.close();
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Find-closest query error: " + e.toString());
+        }
+
+    }
+
+    /**
+     * Run a query to determine which kmers in a set are hammers.
+     *
+     * @param query		query object to use
+     * @param kmers		set of kmers to check
+     * @param hammerSet	output set into which hammers found are placed
+     *
+     * @throws SQLException
+     */
+    private void runHammerQuery(DbQuery query, HashSet<String> kmers, HashSet<String> hammerSet) throws SQLException {
+        this.setupBatchQuery(query, kmers);
+        int count = 0;
+        for (DbRecord result : query) {
+            String hammer = result.getString("Hammer.hammer");
+            kmers.add(hammer);
+        }
+        log.info("{} kmers queried, {} were hammers.", kmers.size(), count);
+
     }
 
 }

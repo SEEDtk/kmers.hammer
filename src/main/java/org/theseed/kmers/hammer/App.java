@@ -23,6 +23,7 @@ import org.theseed.utils.BaseProcessor;
  *  pseudoBins	produce a simulated bin report from a binned sample group
  *  krakenBins	produce a simulated bin report from kraken output in a sample group
  *  binComp		do a comparison of bin reports
+ *  filter		filter a hammer database by removing hammers in other genomes
  */
 public class App
 {
@@ -80,6 +81,9 @@ public class App
             break;
         case "binComp" :
             processor = new BinReportCompareProcessor();
+            break;
+        case "filter" :
+            processor = new HammerFilterProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

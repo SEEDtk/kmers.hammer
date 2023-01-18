@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import org.theseed.counters.WeightMap;
@@ -26,6 +27,8 @@ public class HashHammerDb extends HammerDb {
     // FIELDS
     /** map of hammers to hammer source data */
     private Map<String, Source> hammerMap;
+    /** name of hammer load file */
+    private File dbFile;
     /** maximum hash size */
     private static final int MAX_HASH = 0x10000000;
 
@@ -40,10 +43,11 @@ public class HashHammerDb extends HammerDb {
      */
     public HashHammerDb(File inFile) throws IOException, ParseFailureException {
         this.load(inFile);
+        this.dbFile = inFile;
     }
 
     public HashHammerDb(IParms processor) throws ParseFailureException, IOException {
-        File dbFile = processor.getDbFile();
+        this.dbFile = processor.getDbFile();
         if (dbFile == null)
             throw new ParseFailureException("File must be specified for in-memory hammer database.");
         this.load(processor.getDbFile());
@@ -95,7 +99,7 @@ public class HashHammerDb extends HammerDb {
         for (String kmer : kIter) {
             HammerDb.Source source = this.hammerMap.get(kmer);
             if (source != null)
-                this.countHit(map, source);
+                this.countHit(map, source, 1);
         }
     }
 
@@ -122,6 +126,20 @@ public class HashHammerDb extends HammerDb {
                     collection.add(hit);
                 }
             }
+        }
+    }
+
+    @Override
+    public File getLoadFile() {
+        return this.dbFile;
+    }
+
+    @Override
+    protected void findHammersInternal(HashSet<String> hammerSet, String seq, int kSize) {
+        SequenceKmerIterable iter = new SequenceKmerIterable(seq, kSize);
+        for (String kmer : iter) {
+            if (this.hammerMap.containsKey(kmer))
+                hammerSet.add(kmer);
         }
     }
 
