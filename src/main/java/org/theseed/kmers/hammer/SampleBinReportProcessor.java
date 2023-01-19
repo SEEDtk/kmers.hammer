@@ -11,9 +11,11 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.stream.Stream;
 
 import org.kohsuke.args4j.Argument;
@@ -22,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.counters.WeightMap;
 import org.theseed.io.TabbedLineReader;
+import org.theseed.proteins.hammer.ClassStrategy;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.fastq.FastqSampleGroup;
@@ -45,20 +48,20 @@ import org.theseed.utils.ParseFailureException;
  * -t	type of sample group (default FASTQ)
  *
  * --hType		type of hammer database (default MEMORY)
- * --method		voting method to use (default COUNT)
+ * --strategy	scoring strategy to use (default HITS)
  * --file		file containing hammer database (either SQLite database or hammer flat file)
  * --url		URL of database (host and name, MySQL only)
  * --parms		database connection parameter string (MySQL only)
  * --type		database engine type (default MEMORY)
  * --para		use parallel processing
  * --min		minimum score for an acceptable genome hit (default 10)
- * --qual		minimum acceptable quality for an acceptable sequence (default 10.0)
+ * --qual		minimum quality for an acceptable sequence (default 10.0)
  * --seqBatch	maximum number of kilobases to process at one time (default 1000)
  *
  * @author Bruce Parrello
  *
  */
-public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
+public class SampleBinReportProcessor extends BaseHammerUsageProcessor implements ClassStrategy.IParms {
 
     // FIELDS
     /** logging facility */
@@ -83,12 +86,20 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
     private int goodScores;
     /** maximum batch size in base pairs */
     private int maxBatchDnaSize;
+    /** classification strategy helper */
+    private ClassStrategy strategy;
+    /** weight map size to use */
+    private int mapSize;
 
     // COMMAND-LINE OPTIONS
 
     /** type of input sample group */
     @Option(name = "--sType", aliases = { "-t" }, usage = "type of input sample group")
     private FastqSampleGroup.Type groupType;
+
+    /** type of classification strategy */
+    @Option(name = "--strategy", usage = "strategy for classifying sequences")
+    private ClassStrategy.Type strategyType;
 
     /** if specified, parallel processing will be used */
     @Option(name = "--para", usage = "if specified, samples will be processed in parallel")
@@ -122,6 +133,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
         this.minScore = 10.0;
         this.minQual = 10.0;
         this.seqBatchSize = 1000;
+        this.strategyType = ClassStrategy.Type.HITS;
     }
 
     @Override
@@ -144,6 +156,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
         if (! this.repStatsFile.canRead())
             throw new FileNotFoundException("Repgen stats file " + this.repStatsFile + " is not found or unreadable.");
         this.genomeMap = TabbedLineReader.readMap(this.repStatsFile, "1", "2");
+        // Compute the weight map size to use.
+        this.mapSize = this.genomeMap.size() * 4 / 3 + 1;
+        // Create the strategy helper.
+        this.strategy = this.strategyType.create(this);
     }
 
     @Override
@@ -198,10 +214,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
         // FASTA, these batches will generally be size 1, but with lots of DNA.  For FASTQ, the
         // batches will be large size, so also with lots of DNA.
         int batchSize = 0;
-        List<Sequence> batch = new ArrayList<Sequence>(batchSize);
+        var batch = new HashMap<String, Sequence>();
         double batchCoverage = 1.0;
         // Start with an empty weight map.
-        WeightMap results = new WeightMap(this.genomeMap.size() * 4 / 3 + 1);
+        WeightMap results = new WeightMap(this.mapSize);
         // Get local versions of the counters.
         int mySeqsIn = 0;
         int myBatchCount = 0;
@@ -220,8 +236,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
                     // Here we must process the current batch.  Get the scores and
                     // add them in.
                     myBatchCount++;
-                    WeightMap scores = this.processBatch(batch);
-                    results.accumulate(scores, batchCoverage);
+                    WeightMap scores = this.processBatch(batch, batchCoverage);
+                    results.accumulate(scores);
                     // Set up for the new sequence.
                     batchCoverage = coverage;
                     batch.clear();
@@ -232,16 +248,17 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
                     }
                 }
                 // Convert the read to a sequence and add it to the batch.
-                Sequence seq = new Sequence(seqRead.getLabel(), "", seqRead.getSequence());
-                batch.add(seq);
+                final String seqId = seqRead.getLabel();
+                Sequence seq = new Sequence(seqId, "", seqRead.getSequence());
+                batch.put(seqId, seq);
                 batchSize += seq.length();
             }
         }
         // Process the residual batch.
         if (batch.size() > 0) {
             myBatchCount++;
-            WeightMap scores = this.processBatch(batch);
-            results.accumulate(scores, batchCoverage);
+            WeightMap scores = this.processBatch(batch, batchCoverage);
+            results.accumulate(scores);
         }
         log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.",
                 sampleId, mySeqsIn, myBatchCount, myQualReject, results.size());
@@ -276,12 +293,44 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
     /**
      * Process a batch of sequences and return the genome weights.
      *
-     * @param batch		 batch of sequences to process
+     * @param batch		batch of sequences to process
+     * @param coverage	coverage for all the sequences in the batch
      *
-     * @return a weight map containing the score for each genome in this batch.
+     * @return a weight map containing the score for each genome in this batch's sequences
      */
-    private WeightMap processBatch(List<Sequence> batch) {
-        return this.hammers.findClosest(batch);
+    private WeightMap processBatch(Map<String, Sequence> batch, double coverage) {
+        WeightMap retVal = new WeightMap(this.mapSize);
+        // Get all the hits for the batch, sorted by location.
+        SortedSet<HammerDb.Hit> hits = this.hammers.findHits(batch.values());
+        // Loop through the hits.  For each sequence, we compute its scores and accumulate them
+        // in the return map.  This requires batching the hits.  Because of the sort, all the
+        // hits for a sequence will be together.  We need to remember the ID and length of the
+        // current sequence.
+        String seqId = "";
+        int seqLen = 0;
+        Collection<HammerDb.Hit> hitSet = new ArrayList<HammerDb.Hit>(hits.size());
+        for (var hit : hits) {
+            String hitSeqId = hit.getLoc().getContigId();
+            if (! hitSeqId.contentEquals(seqId)) {
+                // This hit is for a new batch.  Process the old one.
+                if (hitSet.size() > 0) {
+                    WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
+                    retVal.accumulate(batchMap);
+                    hitSet.clear();
+                }
+                seqId = hitSeqId;
+                seqLen = batch.get(hitSeqId).length();
+            }
+            // Add this hit to the current batch.
+            hits.add(hit);
+        }
+        // Check for a residual batch.
+        if (hitSet.size() > 0) {
+            WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
+            retVal.accumulate(batchMap);
+        }
+        // Return the accumulated scores.
+        return retVal;
     }
 
     /**
@@ -307,6 +356,11 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor {
         }
         // Try to keep the output aligned on sample boundaries so we can restart.
         writer.flush();
+    }
+
+    @Override
+    public double getMinScore() {
+        return this.minScore;
     }
 
 

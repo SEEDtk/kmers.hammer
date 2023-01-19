@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -463,9 +464,9 @@ public abstract class HammerDb {
     }
 
     /**
-     * @return the individual hits for a collection of sequences
+     * @return the individual hits for a collection of sequences, sorted by location
      */
-    public Collection<Hit> findHits(Collection<Sequence> seqs) {
+    public SortedSet<Hit> findHits(Collection<Sequence> seqs) {
         // Process the forward direction.
         TreeSet<Hit> retVal = new TreeSet<Hit>();
         this.findHitsInternal(retVal, seqs, this.kmerSize, true);

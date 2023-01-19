@@ -225,7 +225,8 @@ public class SqlHammerDb extends HammerDb {
      * Run a database query to find all the genomes for the specified kmers and update the score map.
      *
      * @param query		query to fill with parameters and run
-     * @param kmers		parameter values to store in the query, indicating the kmers to run
+     * @param kmers		parameter values to store in the query, indicating the kmers to run, mapped
+     * 					to the number of hits for each
      * @param gCounts	score map for recording results
      *
      * @throws SQLException
