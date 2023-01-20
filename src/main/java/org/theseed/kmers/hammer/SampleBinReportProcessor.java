@@ -126,6 +126,23 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Argument(index = 1, metaVar = "repgen.stats.tbl", usage = "repgen stats file containing representative genome names")
     private File repStatsFile;
 
+    /**
+     * This is a small utility object that tracks hit/read statistics for a sample.
+     */
+    protected class SampleStats {
+
+        /** number of sequences with hits */
+        private int hitSeqCount;
+        /** number of hits */
+        private int hitCount;
+
+        protected SampleStats() {
+            this.hitSeqCount = 0;
+            this.hitCount = 0;
+        }
+
+    }
+
     @Override
     protected void setHammerDefaults() {
         this.paraFlag = false;
@@ -222,6 +239,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         int mySeqsIn = 0;
         int myBatchCount = 0;
         int myQualReject = 0;
+        // Create a stats object to pass to the batch processor.
+        SampleStats stats = new SampleStats();
         // Loop through the stream.
         while (inStream.hasNext()) {
             SeqRead seqRead = inStream.next();
@@ -236,11 +255,12 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                     // Here we must process the current batch.  Get the scores and
                     // add them in.
                     myBatchCount++;
-                    WeightMap scores = this.processBatch(batch, batchCoverage);
+                    WeightMap scores = this.processBatch(batch, batchCoverage, stats);
                     results.accumulate(scores);
                     // Set up for the new sequence.
                     batchCoverage = coverage;
                     batch.clear();
+                    batchSize = 0;
                     if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 5000) {
                         lastMessage = System.currentTimeMillis();
                         double rate = mySeqsIn * 1000.0 / (lastMessage - start);
@@ -257,11 +277,11 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // Process the residual batch.
         if (batch.size() > 0) {
             myBatchCount++;
-            WeightMap scores = this.processBatch(batch, batchCoverage);
+            WeightMap scores = this.processBatch(batch, batchCoverage, stats);
             results.accumulate(scores);
         }
-        log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.",
-                sampleId, mySeqsIn, myBatchCount, myQualReject, results.size());
+        log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} sequences hit, {} per sequence.",
+                sampleId, mySeqsIn, myBatchCount, myQualReject, results.size(), stats.hitSeqCount, ((double) stats.hitCount) / stats.hitSeqCount);
         // Output the genome weights.
         this.writeSample(writer, sampleId, results);
         // Update the counts.
@@ -298,7 +318,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
      *
      * @return a weight map containing the score for each genome in this batch's sequences
      */
-    private WeightMap processBatch(Map<String, Sequence> batch, double coverage) {
+    private WeightMap processBatch(Map<String, Sequence> batch, double coverage, SampleStats stats) {
         WeightMap retVal = new WeightMap(this.mapSize);
         // Get all the hits for the batch, sorted by location.
         SortedSet<HammerDb.Hit> hits = this.hammers.findHits(batch.values());
@@ -316,18 +336,22 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 if (hitSet.size() > 0) {
                     WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
                     retVal.accumulate(batchMap);
+                    stats.hitSeqCount++;
+                    stats.hitCount += hitSet.size();
                     hitSet.clear();
                 }
                 seqId = hitSeqId;
                 seqLen = batch.get(hitSeqId).length();
             }
             // Add this hit to the current batch.
-            hits.add(hit);
+            hitSet.add(hit);
         }
         // Check for a residual batch.
         if (hitSet.size() > 0) {
             WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
             retVal.accumulate(batchMap);
+            stats.hitSeqCount++;
+            stats.hitCount += hitSet.size();
         }
         // Return the accumulated scores.
         return retVal;
