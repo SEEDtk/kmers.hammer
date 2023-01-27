@@ -35,7 +35,7 @@ public abstract class ClassStrategy {
         /**
          * @return the minimum threshold score required to be considered a dominant group for a sequence
          */
-        public double getMinScore();
+        public int getMinDiff();
 
     }
 

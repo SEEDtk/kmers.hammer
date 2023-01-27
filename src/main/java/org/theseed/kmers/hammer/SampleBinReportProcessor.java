@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -57,6 +58,8 @@ import org.theseed.utils.ParseFailureException;
  * --min		minimum score for an acceptable genome hit (default 10)
  * --qual		minimum quality for an acceptable sequence (default 10.0)
  * --seqBatch	maximum number of kilobases to process at one time (default 1000)
+ * --diff		minimum number of additional hits for a region-based classification
+ * --resume		name of an existing report file containing data from samples already run
  *
  * @author Bruce Parrello
  *
@@ -109,6 +112,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Option(name = "--min", metaVar = "20.0", usage = "minimum acceptable score for a genome presence")
     private double minScore;
 
+    /** minimum number of additional hits for a region-based determination to count */
+    @Option(name = "--diff", metaVar = "5", usage = "minimum number of additional hits required to qualify as a regional group classification")
+    private int minDiff;
+
     /** minimum acceptable quality for an input sequence */
     @Option(name = "--qual", metaVar = "30.0", usage = "minimum acceptable sequence quality (0 to 99)")
     private double minQual;
@@ -116,6 +123,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     /** maximum number of kilobases */
     @Option(name = "--seqBatch", metaVar = "2000", usage = "maximum number of kilobases to process in a batch")
     private int seqBatchSize;
+
+    /** name of previous report file */
+    @Option(name = "--resume", metaVar = "binReport.old.tbl", usage = "if specified, the name of a previous report containing results for samples that do not need to be rerun")
+    private File resumeFile;
 
     /** input sample group directory (or file) */
     @Argument(index = 0, metaVar = "inDir", usage = "input sample group directory (or file for certain types)",
@@ -135,10 +146,13 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         private int hitSeqCount;
         /** number of hits */
         private int hitCount;
+        /** number of ambiguous reads */
+        private int ambigCount;
 
         protected SampleStats() {
             this.hitSeqCount = 0;
             this.hitCount = 0;
+            this.ambigCount = 0;
         }
 
     }
@@ -151,6 +165,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.minQual = 10.0;
         this.seqBatchSize = 1000;
         this.strategyType = ClassStrategy.Type.HITS;
+        this.minDiff = 2;
+        this.resumeFile = null;
     }
 
     @Override
@@ -158,6 +174,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // Validate the minimum score.
         if (this.minScore < 0.0)
             throw new ParseFailureException("Minimum score cannot be negative.");
+        // Validate the minimum difference.
+        if (this.minDiff < 1)
+            throw new ParseFailureException("Minimum hit difference must be at least 1.");
         // Insure the sample group directory exists.
         if (! this.inDir.exists())
             throw new FileNotFoundException("Input sample group " + this.inDir + " not found in file system.");
@@ -173,6 +192,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         if (! this.repStatsFile.canRead())
             throw new FileNotFoundException("Repgen stats file " + this.repStatsFile + " is not found or unreadable.");
         this.genomeMap = TabbedLineReader.readMap(this.repStatsFile, "1", "2");
+        // Check for a resume file.
+        if (this.resumeFile != null && ! this.resumeFile.canRead())
+            throw new FileNotFoundException("Resume file " + this.resumeFile + " is not found or unreadable.");
         // Compute the weight map size to use.
         this.mapSize = this.genomeMap.size() * 4 / 3 + 1;
         // Create the strategy helper.
@@ -196,6 +218,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         try (FastqSampleGroup sampleGroup = this.groupType.create(this.inDir)) {
             Set<String> samples = sampleGroup.getSamples();
             log.info("{} samples found in {}.", samples.size(), this.inDir);
+            // Now process the resume file (if any).
+            if (this.resumeFile != null)
+                this.processResume(samples, writer);
             // Now we loop through the samples.
             Stream<String> sampleStream = samples.stream();
             if (this.paraFlag)
@@ -209,6 +234,36 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             log.info("Process time was {}.  {} per sample.", allTime, perSample);
             log.info("{} sequences read, {} rejected, {} batches processed.", this.seqsIn, this.qualReject, this.batchCount);
             log.info("{} sample/genome pairs output, {} rejected due to low score.", this.goodScores, this.badScores);
+        }
+    }
+
+    /**
+     * Process the resume file.  We copy the file to the output and remove the sample IDs found from the
+     * list of samples to process.
+     *
+     * @param samples	list of samples to process (will be modified)
+     * @param writer	print writer for the output report
+     *
+     * @throws IOException
+     */
+    private void processResume(Set<String> samples, PrintWriter writer) throws IOException {
+        try (TabbedLineReader resumeStream = new TabbedLineReader(this.resumeFile)) {
+            if (resumeStream.findColumn("sample_id") != 0)
+                throw new IOException(this.resumeFile + " does not appear to be a bin report file.");
+            // Loop through the resume file, copying report data.
+            log.info("Restoring old sample data from {}.", this.resumeFile);
+            int lineIn = 0;
+            Set<String> newSamples = new HashSet<String>(samples.size() * 4 / 3 + 1);
+            for (var line : resumeStream) {
+                String newSample = line.get(0);
+                newSamples.add(newSample);
+                writer.println(line.toString());
+                lineIn++;
+            }
+            log.info("{} lines read containing {} samples.", lineIn, newSamples.size());
+            // Remove the samples found here from the set of samples to process.
+            samples.removeAll(newSamples);
+            log.info("{} samples remaining after resume processing.", samples.size());
         }
     }
 
@@ -280,8 +335,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             WeightMap scores = this.processBatch(batch, batchCoverage, stats);
             results.accumulate(scores);
         }
-        log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} sequences hit, {} per sequence.",
-                sampleId, mySeqsIn, myBatchCount, myQualReject, results.size(), stats.hitSeqCount, ((double) stats.hitCount) / stats.hitSeqCount);
+        log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} ambiguous sequences, {} sequences classified, {} per sequence.",
+                sampleId, mySeqsIn, myBatchCount, myQualReject, results.size(), stats.ambigCount, stats.hitSeqCount, ((double) stats.hitCount) / stats.hitSeqCount);
         // Output the genome weights.
         this.writeSample(writer, sampleId, results);
         // Update the counts.
@@ -334,10 +389,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             if (! hitSeqId.contentEquals(seqId)) {
                 // This hit is for a new batch.  Process the old one.
                 if (hitSet.size() > 0) {
-                    WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
-                    retVal.accumulate(batchMap);
-                    stats.hitSeqCount++;
-                    stats.hitCount += hitSet.size();
+                    this.updateMap(coverage, stats, retVal, seqLen, hitSet);
                     hitSet.clear();
                 }
                 seqId = hitSeqId;
@@ -348,13 +400,31 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         }
         // Check for a residual batch.
         if (hitSet.size() > 0) {
-            WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
-            retVal.accumulate(batchMap);
-            stats.hitSeqCount++;
-            stats.hitCount += hitSet.size();
+            this.updateMap(coverage, stats, retVal, seqLen, hitSet);
         }
         // Return the accumulated scores.
         return retVal;
+    }
+
+    /**
+     * Update the master weight map from the hits for a sequence.
+     *
+     * @param coverage		sequence coverage
+     * @param stats			statistics for this sample
+     * @param masterMap		master weight map to update
+     * @param seqLen		length of the sequence
+     * @param hitSet		set of hits against the sequence
+     */
+    public void updateMap(double coverage, SampleStats stats, WeightMap masterMap, int seqLen,
+            Collection<HammerDb.Hit> hitSet) {
+        WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
+        if (batchMap.size() <= 0)
+            stats.ambigCount++;
+        else {
+            masterMap.accumulate(batchMap);
+            stats.hitSeqCount++;
+            stats.hitCount += hitSet.size();
+        }
     }
 
     /**
@@ -383,8 +453,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     }
 
     @Override
-    public double getMinScore() {
-        return this.minScore;
+    public int getMinDiff() {
+        return this.minDiff;
     }
 
 

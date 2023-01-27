@@ -23,8 +23,8 @@ public class RegionsClassStrategy extends ClassStrategy {
 
     public RegionsClassStrategy(IParms processor) {
         super(processor);
-        // Save the threshold score.  We will be doing integer counts, so we cast it to integer.
-        this.minScore = (int) Math.ceil(processor.getMinScore());
+        // Save the threshold score.
+        this.minScore =processor.getMinDiff();
     }
 
     @Override
@@ -43,7 +43,7 @@ public class RegionsClassStrategy extends ClassStrategy {
             var bestCounter = sortedCounts.get(0);
             int secondCount = (sortedCounts.size() <= 1 ? 0 : sortedCounts.get(1).getCount());
             // If the threshold is met, count the best group.
-            if (bestCounter.getCount() - secondCount > this.minScore)
+            if (bestCounter.getCount() - secondCount >= this.minScore)
                 retVal.count(bestCounter.getKey(), len * covg / ClassStrategy.SCALE_FACTOR);
         }
         return retVal;
