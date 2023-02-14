@@ -22,8 +22,10 @@ import org.theseed.utils.BaseProcessor;
  *  sampReport	produce a bin report for a sample group using hammers
  *  pseudoBins	produce a simulated bin report from a binned sample group
  *  krakenBins	produce a simulated bin report from kraken output in a sample group
+ *  synthBins	produce a simulated bin report from a synthetic contig file
  *  binComp		do a comparison of bin reports
  *  filter		filter a hammer database by removing hammers in other genomes
+ *  list		produce a report on a hammer database
  */
 public class App
 {
@@ -79,11 +81,17 @@ public class App
         case "krakenBins" :
             processor = new KrakenBinReportProcessor();
             break;
+        case "synthBins" :
+            processor = new SynthBinReportProcessor();
+            break;
         case "binComp" :
             processor = new BinReportCompareProcessor();
             break;
         case "filter" :
             processor = new HammerFilterProcessor();
+            break;
+        case "list" :
+            processor = new HammerReportProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -498,6 +499,15 @@ public abstract class HammerDb {
      * @param kSize			kmer size to use
      */
     protected abstract void findHammersInternal(HashSet<String> hammerSet, String seq, int kSize);
+
+    /**
+     * Find all the hammers for a specified source genome.
+     *
+     * @param genomeId		ID of the source genome
+     *
+     * @return a map from each hammer in the genome to its source
+     */
+    public abstract Map<String, Source> findGenomeHammers(String genomeId);
 
     /**
      * Count a hit in a result map.

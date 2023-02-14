@@ -143,4 +143,18 @@ public class HashHammerDb extends HammerDb {
         }
     }
 
+    @Override
+    public Map<String, Source> findGenomeHammers(String genomeId) {
+        Map<String, Source> retVal = new HashMap<String, Source>();
+        // This is a slow algorithm, since we don't have the hammers organized by genome ID.
+        // We have to do a sequential search.
+        for (var hammerEntry : this.hammerMap.entrySet()) {
+            Source source = hammerEntry.getValue();
+            if (source.getGenomeId().contentEquals(genomeId))
+                retVal.put(hammerEntry.getKey(), source);
+        }
+        return retVal;
+    }
+
+
 }

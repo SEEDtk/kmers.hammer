@@ -21,6 +21,7 @@ import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.DbLoader;
 import org.theseed.java.erdb.DbQuery;
 import org.theseed.java.erdb.DbRecord;
+import org.theseed.java.erdb.Relop;
 import org.theseed.java.erdb.SqlBuffer;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
@@ -347,7 +348,7 @@ public class SqlHammerDb extends HammerDb {
 
     @Override
     protected void findHammersInternal(HashSet<String> hammerSet, String seq, int kSize) {
-        // For performance reason, we batch the kmer queries.  We will collect a batch of
+        // For performance reasons, we batch the kmer queries.  We will collect a batch of
         // kmers, ask for the feature IDs, and count the results.  This gets repeated
         // until we reach the end.
         try {
@@ -409,6 +410,28 @@ public class SqlHammerDb extends HammerDb {
         }
         log.info("{} kmers queried, {} were hammers.", kmers.size(), count);
 
+    }
+
+    @Override
+    public Map<String, Source> findGenomeHammers(String genomeId) {
+        // Set up the output hash.
+        Map<String, Source> retVal = new HashMap<String, Source>();
+        // Create a query to look for all hammers with a matching feature ID.
+        try (DbQuery query = new DbQuery(this.db, "Hammer")) {
+            query.select("Hammer", "fid", "hammer", "strength");
+            query.rel("Hammer.fid", Relop.LIKE);
+            query.setParm(1, "fig|" + genomeId + ".%");
+            // Loop through the results, adding them to the return hash.
+            for (DbRecord result : query) {
+                String hammer = result.getString("Hammer.hammer");
+                Source source = new Source(result.getString("Hammer.fid"), result.getDouble("Hammer.strength"));
+                retVal.put(hammer, source);
+            }
+        } catch (SQLException e) {
+            // Rethrow as a run-time exception.
+            throw new RuntimeException(e);
+        }
+        return retVal;
     }
 
 }
