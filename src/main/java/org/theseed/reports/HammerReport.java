@@ -117,20 +117,11 @@ public abstract class HammerReport {
 
 
     /**
-     * Write a line of output.
-     *
-     * @param line		output line to writer
-     */
-    public void println(String line) {
-        this.writer.println(line);
-    }
-
-    /**
      * Write a set of output fields.
      *
      * @param strings	array of strings containing the field values
      */
-    public void printFields(String... strings) {
+    public synchronized void printFields(String... strings) {
         this.writer.println(StringUtils.join(strings, '\t'));
     }
 
