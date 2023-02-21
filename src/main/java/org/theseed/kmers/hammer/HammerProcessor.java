@@ -207,6 +207,7 @@ public class HammerProcessor extends BaseReportProcessor {
             this.start = System.currentTimeMillis();
             genomeIdList.stream().forEach(x -> this.processGenome(x, writer));
         }
+        // TODO backup to temp file, read and remove duplicates, rewrite
     }
 
     /**
