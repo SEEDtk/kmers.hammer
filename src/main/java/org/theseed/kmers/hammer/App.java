@@ -26,6 +26,7 @@ import org.theseed.utils.BaseProcessor;
  *  binComp		do a comparison of bin reports
  *  filter		filter a hammer database by removing hammers in other genomes
  *  list		produce a report on a hammer database
+ *  trimCheck	produce a FASTA file by comparing trimmed and untrimmed reads
  */
 public class App
 {
@@ -92,6 +93,9 @@ public class App
             break;
         case "list" :
             processor = new HammerReportProcessor();
+            break;
+        case "trimCheck" :
+            processor = new TrimCheckProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");
