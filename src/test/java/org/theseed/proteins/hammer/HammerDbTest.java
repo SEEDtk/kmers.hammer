@@ -11,6 +11,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -19,6 +20,7 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Test;
 import org.theseed.counters.WeightMap;
 import org.theseed.genome.Genome;
+import org.theseed.io.TabbedLineReader;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.sqlite.SqliteDbConnection;
 import org.theseed.locations.Location;
@@ -54,6 +56,29 @@ class HammerDbTest {
         // Now the database is loaded, so we run the tests.
         hammerDbTester(hammers);
     }
+
+    @Test
+    void testHammerSets() throws IOException {
+        // Read the load file into a string set.
+        Set<String> testHammers = TabbedLineReader.readSet(LOAD_FILE, "1");
+        // Put them in a set.
+        HammerSet testSet = new HammerSet(20);
+        for (String hammer : testHammers) {
+            boolean ok = testSet.add(hammer);
+            assertThat(hammer, ok, equalTo(true));
+        }
+        // Test to make sure they made it and don't re-add.
+        for (String hammer : testHammers) {
+            assertThat(hammer, testSet.contains(hammer), equalTo(true));
+            boolean bad = testSet.add(hammer);
+            assertThat(hammer, bad, equalTo(false));
+        }
+        // Test some not expected in the set.
+        assertThat(testSet.contains("acgtacgtacgtaaaaaaaa"), equalTo(false));
+        assertThat(testSet.contains("cccacgtacgtacgtaaaaa"), equalTo(false));
+        assertThat(testSet.contains("cccacgtacgtacytaaaaa"), equalTo(false));
+    }
+
 
     /**
      * This tests a hammer database.  The database must be loaded from hammers200.tbl before calling.
@@ -109,7 +134,22 @@ class HammerDbTest {
                 break;
             }
         }
-
+        // Test the hammers-in-genome method.  We need to re-read the hammer file to get a list.
+        Set<String> found = new HashSet<String>(8800);
+        try (TabbedLineReader dbStream = new TabbedLineReader(LOAD_FILE)) {
+            for (var line : dbStream) {
+                String fid = line.get(1);
+                if (fid.startsWith("fig|1278308.3.peg"))
+                    found.add(line.get(0));
+            }
+        }
+        // Now compare the lists.
+        var gHammers = hammers.findGenomeHammers("1278308.3");
+        assertThat(gHammers.size(), equalTo(found.size()));
+        for (String hammer : gHammers.keySet())
+            assertThat(hammer, in(found));
     }
+
+
 
 }

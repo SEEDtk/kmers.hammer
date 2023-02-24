@@ -57,7 +57,7 @@ public class HammerArray implements Iterable<String> {
 
         @Override
         public String next() {
-            String retVal = HammerDb.decode(HammerArray.this.hammers[this.idx], HammerArray.this.kSize);
+            String retVal = HammerMap.decode(HammerArray.this.hammers[this.idx], HammerArray.this.kSize);
             this.idx++;
             return retVal;
         }
@@ -104,7 +104,7 @@ public class HammerArray implements Iterable<String> {
        if (index < 0 || index >= this.size)
            throw new IndexOutOfBoundsException("Attempt to access position " + Integer.toString(index) + " in hammer array with "
                    + Integer.toString(this.size) + " values.");
-       String retVal = HammerDb.decode(this.hammers[index], this.kSize);
+       String retVal = HammerMap.decode(this.hammers[index], this.kSize);
        return retVal;
     }
 

@@ -25,10 +25,10 @@ class EncodingTest {
             long oldEncoded = -1;
             for (var line : testStream) {
                 String hammerIn = line.get(0);
-                long encoded = HammerDb.encode(hammerIn, 20);
+                long encoded = HammerMap.encode(hammerIn, 20);
                 assertThat(hammerIn, encoded, not(equalTo(oldEncoded)));
                 assertThat(hammerIn, encoded, greaterThanOrEqualTo(0l));
-                String hammerOut = HammerDb.decode(encoded, 20);
+                String hammerOut = HammerMap.decode(encoded, 20);
                 assertThat(hammerOut, equalTo(hammerIn));
                 oldEncoded = encoded;
             }

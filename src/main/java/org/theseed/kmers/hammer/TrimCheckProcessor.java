@@ -40,6 +40,7 @@ import org.theseed.utils.ParseFailureException;
  * -o	output FASTA file (if not STDOUT)
  *
  * --qual	minimum acceptable sequence quality (default 10.0)
+ * --kmer	kmer size for hammers (default 20)
  *
  * @author Bruce Parrello
  *
@@ -67,6 +68,10 @@ public class TrimCheckProcessor extends BaseProcessor {
     private int adaptersFound;
     /** number of untrimmed reads found */
     private int untrimCount;
+    /** number of shortened sequences */
+    private int shortened;
+    /** number of bytes removed by shortening */
+    private int shortAmount;
     /** number of sequences output */
     private int seqCount;
     /** file filter to return only possible FASTQ files */
@@ -88,6 +93,10 @@ public class TrimCheckProcessor extends BaseProcessor {
     @Option(name = "--qual", metaVar = "30.0", usage = "minimum acceptable sequence quality (0 to 99)")
     private double minQual;
 
+    /** kmer size for the hammers */
+    @Option(name = "--kmer", metaVar = "21", usage = "kmer size used for hammers")
+    private int kmerSize;
+
     /** output FASTA file name */
     @Option(name = "--output", aliases = { "-o" }, metaVar = "outFile.fna", usage = "output FASTA file name (if not STDOUT)")
     private File outFile;
@@ -103,12 +112,16 @@ public class TrimCheckProcessor extends BaseProcessor {
     @Override
     protected void setDefaults() {
         this.minQual = 10.0;
+        this.kmerSize = 20;
         this.outFile = null;
         this.outStream = null;
     }
 
     @Override
     protected boolean validateParms() throws IOException, ParseFailureException {
+        // Validate the kmer size.
+        if (this.kmerSize < 1)
+            throw new ParseFailureException("Kmer size must be at least 1.");
         // Verify that the input directory exists.
         if (! this.inDir.isDirectory())
             throw new FileNotFoundException("Input directory " + this.inDir + " is not found or invalid.");
@@ -161,6 +174,8 @@ public class TrimCheckProcessor extends BaseProcessor {
         this.rejected = 0;
         this.seqCount = 0;
         this.untrimCount = 0;
+        this.shortened = 0;
+        this.shortAmount = 0;
         // Initialize the reject-quality trackers.
         this.maxRejectQual = 0.0;
         this.rejectedQual = 0.0;
@@ -186,8 +201,8 @@ public class TrimCheckProcessor extends BaseProcessor {
                         this.downgrades++;
                     } else {
                         // Check for an adapter trim.
-                        this.checkTrim(untrimmedId, trimmedCurr.getLseq(), untrimmedCurr.getLseq(), "left adapter");
-                        this.checkTrim(untrimmedId, trimmedCurr.getRseq(), untrimmedCurr.getRseq(), "right adapter");
+                        this.checkTrim(untrimmedId, trimmedCurr.getLseq(), untrimmedCurr.getLseq(), "left");
+                        this.checkTrim(untrimmedId, trimmedCurr.getRseq(), untrimmedCurr.getRseq(), "right");
                     }
                     // Push forward to the next trimmed read.
                     trimmedCurr = trimmedReads.safeNext();
@@ -212,6 +227,11 @@ public class TrimCheckProcessor extends BaseProcessor {
             if (this.rejected > 0) {
                 double meanReject = this.rejectedQual / this.rejected;
                 log.info("Mean quality of rejected sequences was {}. Max was {}.", meanReject, this.maxRejectQual);
+            }
+            // Do the metrics on the shortening.
+            if (this.shortened > 0) {
+                double meanShort = this.shortAmount / (double) this.shortened;
+                log.info("{} sequences shortened, mean amount {}.", this.shortened, meanShort);
             }
         } finally {
             // Insure the output file is closed.
@@ -248,9 +268,9 @@ public class TrimCheckProcessor extends BaseProcessor {
         String label = String.format("%s.%08d", this.sampleName, this.seqCount);
         // Format the full comment.
         StringBuilder outComment = new StringBuilder(80);
-        outComment.append(untrimmedId).append('\t').append(comment);
+        outComment.append(untrimmedId).append('\t').append(comment).append('\t');
         if (Double.isFinite(qual))
-            outComment.append('\t').append(qual);
+            outComment.append(qual);
         // Write the sequence.
         this.outStream.write(new Sequence(label, outComment.toString(), sequence));
     }
@@ -266,14 +286,29 @@ public class TrimCheckProcessor extends BaseProcessor {
      * @throws IOException
      */
     private void checkTrim(String untrimmedId, String trimmedSeq, String untrimmedSeq, String comment) throws IOException {
-        // This method returns -1 if either sequence is NULL (which would be the case if we are dealing
-        // with the missing side of a singleton).
-        int pos = StringUtils.indexOf(untrimmedSeq, trimmedSeq);
-        if (pos > 0) {
-            String adapter = untrimmedSeq.substring(0, pos);
-            this.adaptersFound++;
-            // Write the sequence.  We don't care about quality here.
-            this.writeSequence(untrimmedId, adapter, comment, Double.NaN);
+        // Check for a shortened sequence.  Note that a sequence may be NULL if it's the missing side of a singleton.
+        int originalLen = (untrimmedSeq == null ? 0 : untrimmedSeq.length());
+        int newLen = (trimmedSeq == null ? 0 : trimmedSeq.length());
+        if (newLen < originalLen) {
+            // Here base pairs were trimmed.
+            this.shortened++;
+            int diff = originalLen - newLen;
+            this.shortAmount += diff;
+            // This method returns FALSE if either sequence is NULL (which would be the case if the trimmed sequence
+            // was completely deleted).
+            if (StringUtils.startsWith(untrimmedSeq, trimmedSeq)) {
+                // Find the adapter.  We enforce a minimum equal to the hammer size.
+                int pos;
+                if (diff < this.kmerSize)
+                    pos = originalLen - this.kmerSize;
+                else
+                    pos = originalLen - diff;
+                String adapter = untrimmedSeq.substring(pos);
+                this.adaptersFound++;
+                // Write the sequence.  We don't care about quality here.
+                String outComment = String.format("%s trim length %d", comment, diff);
+                this.writeSequence(untrimmedId, adapter, outComment, Double.NaN);
+            }
         }
     }
 

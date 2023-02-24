@@ -46,13 +46,11 @@ public abstract class HammerDb {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HashHammerDb.class);
+    protected static Logger log = LoggerFactory.getLogger(HammerDb.class);
     /** kmer size to use */
     private int kmerSize;
     /** method to use for counting hits */
     private Method countMethod = Method.COUNT;
-    /** conversion array for encoding/decoding */
-    private static final char[] CONVERTER = new char[] { 'a', 'c', 'g', 't' };
 
     /**
      * This enumeration describes the counting method to be used for finding the closest match.
@@ -562,7 +560,7 @@ public abstract class HammerDb {
      * @return a long integer representation of the hammer, or a negative value if the hammer is invalid
      */
     public long encode(String hammer) {
-        return encode(hammer, this.kmerSize);
+        return HammerMap.encode(hammer, this.kmerSize);
     }
 
     /**
@@ -573,62 +571,7 @@ public abstract class HammerDb {
      * @return the hammer sequence string
      */
     public String decode(long coded) {
-        return decode(coded, this.kmerSize);
-    }
-
-    /**
-     * Encode a hammer into a long integer.  The hammer string should match the kmer size.  If it contains
-     * any ambiguity characters, it is treated as invalid.
-     *
-     * @param hammer	hammer to encode
-     * @param kSize		kmer size for the hammer
-     *
-     * @return a long integer representation of the hammer, or a negative value if the hammer is invalid
-     */
-    public static long encode(String hammer, final int kSize) {
-        long retVal = 0;
-        if (hammer.length() != kSize)
-            retVal = -1;
-        else for (int i = 0; i < kSize && retVal >= 0; i++) {
-            retVal <<= 2;
-            switch (hammer.charAt(i)) {
-            case 'A' :
-            case 'a' :
-                break;
-            case 'C' :
-            case 'c' :
-                retVal |= 1;
-                break;
-            case 'G' :
-            case 'g' :
-                retVal |= 2;
-                break;
-            case 'T' :
-            case 't' :
-                retVal |= 3;
-                break;
-            default:
-                retVal = -1;
-            }
-        }
-        return retVal;
-    }
-
-    /**
-     * Decode a hammer from a long integer.
-     *
-     * @param coded		long integer to decode
-     * @param kSize		kmer size of the hammer
-     *
-     * @return a string representation of the hammer
-     */
-    public static String decode(long coded, final int kSize) {
-        char[] retVal = new char[kSize];
-        for (int i = kSize - 1; i >= 0; i--) {
-            retVal[i] = CONVERTER[(int) (coded & 3)];
-            coded >>= 2;
-        }
-        return String.valueOf(retVal);
+        return HammerMap.decode(coded, this.kmerSize);
     }
 
     /**
@@ -636,6 +579,20 @@ public abstract class HammerDb {
      */
     public int getKmerSize() {
         return this.kmerSize;
+    }
+
+    /**
+     * This is an optional method that gets the source for a hammer.  If it is not supported, it throws an
+     * exception.
+     *
+     * @param hammer	hammer string to find
+     *
+     * @return the source for a hammer
+     *
+     * @throws ParseFailureException
+     */
+    public Source getSource(String hammer) throws ParseFailureException {
+        throw new ParseFailureException("Get-source function not supported by this hammer database type.");
     }
 
 }

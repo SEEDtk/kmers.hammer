@@ -7,26 +7,28 @@ import org.theseed.utils.BaseProcessor;
 /**
  * This program processes DNA hammers.  The commands are as follows.
  *
- *  hammers		find all the hammers for a specified set of genomes
- *  hammersF	use a protein-finder to find all the hammers for a specified repgen set
- *  closest		compute the closest genomes using the hammers
- *  contigs		create a FASTA file for a hammer processor from a genome directory
- *  define		create a hammer definition file from a roles.in.subsystems file
- *  dbLoad		load a hammer database from a flat file
- *  binTest		separate contigs into bins using hammers
- *  contigTest	analyze a contig FASTA file using hammers
- *  scanTest	analyze the results of a synthetic hammer test
- *  scanLocs	compare features hit by bad hammer matches in a synthetic test
- *  distTest	compute the ANI distances to the expected and actual choices in a synthetic test
- *  testStats	produce statistics for each test/match genome pair in a contig test
- *  sampReport	produce a bin report for a sample group using hammers
- *  pseudoBins	produce a simulated bin report from a binned sample group
- *  krakenBins	produce a simulated bin report from kraken output in a sample group
- *  synthBins	produce a simulated bin report from a synthetic contig file
- *  binComp		do a comparison of bin reports
- *  filter		filter a hammer database by removing hammers in other genomes
- *  list		produce a report on a hammer database
- *  trimCheck	produce a FASTA file by comparing trimmed and untrimmed reads
+ *  hammers			find all the hammers for a specified set of genomes
+ *  hammersF		use a protein-finder to find all the hammers for a specified repgen set
+ *  closest			compute the closest genomes using the hammers
+ *  contigs			create a FASTA file for a hammer processor from a genome directory
+ *  define			create a hammer definition file from a roles.in.subsystems file
+ *  dbLoad			load a hammer database from a flat file
+ *  binTest			separate contigs into bins using hammers
+ *  contigTest		analyze a contig FASTA file using hammers
+ *  scanTest		analyze the results of a synthetic hammer test
+ *  scanLocs		compare features hit by bad hammer matches in a synthetic test
+ *  distTest		compute the ANI distances to the expected and actual choices in a synthetic test
+ *  testStats		produce statistics for each test/match genome pair in a contig test
+ *  sampReport		produce a bin report for a sample group using hammers
+ *  pseudoBins		produce a simulated bin report from a binned sample group
+ *  krakenBins		produce a simulated bin report from kraken output in a sample group
+ *  synthBins		produce a simulated bin report from a synthetic contig file
+ *  binComp			do a comparison of bin reports
+ *  filter			filter a hammer database by removing hammers in other genomes
+ *  list			produce a report on a hammer database
+ *  trimCheck		produce a FASTA file by comparing trimmed and untrimmed reads
+ *  contigHammers	produce a ljst of the hammers found in a contig file
+ *  hammerStats		determine which hammers were found in a contig-hammer run and how many of each
  */
 public class App
 {
@@ -96,6 +98,9 @@ public class App
             break;
         case "trimCheck" :
             processor = new TrimCheckProcessor();
+            break;
+        case "hammerStats" :
+            processor = new HammerStatsProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

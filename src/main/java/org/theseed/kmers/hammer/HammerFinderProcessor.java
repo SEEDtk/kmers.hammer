@@ -32,7 +32,7 @@ import org.theseed.utils.ParseFailureException;
  * searches through that role's finder file for kmers that occur in most neighbors of a representative (worthiness) and few
  * genomes outside the neighborhood (precision).
  *
- * The hammers will be written to the standard output, in the standard two-column format for a hammer database.
+ * The hammers will be written to the standard output, in the standard three-column format for a hammer database.
  *
  * The hammers are generated one role at a time.  For each role, we read in all the finder sequences and sort them by
  * genome.  We then build a map from hammers in the representative genomes to scoring objects.

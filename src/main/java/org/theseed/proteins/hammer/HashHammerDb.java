@@ -39,9 +39,9 @@ public class HashHammerDb extends HammerDb {
     /** map of genome IDs to hammer lists */
     private Map<String, HammerArray> genomeMap;
     /** maximum hash size */
-    private static final int MAX_HASH = 0x10000000;
+    public static final int MAX_HASH = 0x10000000;
     /** starting subhash size */
-    private static final int SUBHASH_START = 31;
+    public static final int SUBHASH_START = 31;
 
     /**
      * Construct a hammer database from an input file.  The file must be tab-delimited, with headers,
@@ -261,9 +261,7 @@ public class HashHammerDb extends HammerDb {
             int kSize = HashHammerDb.this.getKmerSize();
             if (kSize == 0)
                 throw new IllegalStateException("Cannot create hash hammer map with unknown kmer size.");
-            int level1Size = 1;
-            if (kSize > 15)
-                level1Size <<= 2 * (kSize - 15);
+            int level1Size = HashHammerDb.getLevel1Size(kSize);
             // Now "level1Size" represents the size of an array that has one slot for every possible bit combination
             // beyond the lowest fifteen base pairs.  We need to fill in the empty hashes.
             HashHammerDb.this.hammerMap = new SubHash[level1Size];
@@ -299,9 +297,30 @@ public class HashHammerDb extends HammerDb {
      */
     private SubHash getSubHash(long hammerCode) {
         // Compute the index of the subhash.
-        int subHashIdx = (int) (hammerCode >>> 30);
+        int subHashIdx = HashHammerDb.getSubHashIndex(hammerCode);
         SubHash subHash = this.hammerMap[subHashIdx];
         return subHash;
+    }
+
+    /**
+     * @return the sub-hash index for an encoded hammer
+     *
+     * @param hammerCode	encoded hammer
+     */
+    public static int getSubHashIndex(long hammerCode) {
+        return (int) (hammerCode >>> 30);
+    }
+
+    /**
+     * @return the required number of entries in the level-one hash for this kmer size
+     *
+     * @param kSize		kmer size to use
+     */
+    public static int getLevel1Size(int kSize) {
+        int retVal = 1;
+        if (kSize > 15)
+            retVal <<= 2 * (kSize - 15);
+        return retVal;
     }
 
     @Override
@@ -319,7 +338,8 @@ public class HashHammerDb extends HammerDb {
      *
      * @param kmer		kmer representing a potential hammer
      */
-    private Source getSource(String kmer) {
+    @Override
+    public Source getSource(String kmer) {
         Source retVal;
         long hammerCode = this.encode(kmer);
         if (hammerCode < 0) {
@@ -386,6 +406,5 @@ public class HashHammerDb extends HammerDb {
         }
         return retVal;
     }
-
 
 }
