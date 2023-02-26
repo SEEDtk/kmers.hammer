@@ -99,6 +99,8 @@ public class HashHammerDb extends HammerDb {
 
         @Override
         public void close() {
+            log.info("Hash load factor is {}. Overload factor is {}.", HashHammerDb.this.hammerMap.loadFactor(),
+                    HashHammerDb.this.hammerMap.overloadFactor());
         }
 
     }
