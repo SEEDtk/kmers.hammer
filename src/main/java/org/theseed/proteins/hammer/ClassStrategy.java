@@ -23,6 +23,8 @@ public abstract class ClassStrategy {
     // FIELDS
     /** logging facility */
     protected static Logger log = LoggerFactory.getLogger(ClassStrategy.class);
+    /** TRUE if the counts should be scaled, else FALSE */
+    private boolean scaled;
     /** scale factor for weighting, based on the typical read length */
     protected static final double SCALE_FACTOR = 180.0;
 
@@ -36,6 +38,11 @@ public abstract class ClassStrategy {
          * @return the minimum threshold score required to be considered a dominant group for a sequence
          */
         public int getMinDiff();
+
+        /**
+         * @return TRUE to scale the counts by length and coverage, else FALSE
+         */
+        public boolean isScaled();
 
     }
 
@@ -73,6 +80,7 @@ public abstract class ClassStrategy {
      * @param processor		controlling command processor
      */
     public ClassStrategy(IParms processor) {
+        this.scaled = processor.isScaled();
     }
 
     /**
@@ -85,5 +93,15 @@ public abstract class ClassStrategy {
      * @return a weight map containing the score for each represented group in the sequence
      */
     public abstract WeightMap computeScores(Collection<HammerDb.Hit> hits, int len, double covg);
+
+    /**
+     * @return the weight to use for a specified length and coverage
+     *
+     * @param len	length of the sequence
+     * @param covg	coverage of the sequence
+     */
+    public double getWeight(int len, double covg) {
+        return (this.scaled ? len * covg / SCALE_FACTOR : 1.0);
+    }
 
 }

@@ -22,7 +22,7 @@ public class HitsClassStrategy extends ClassStrategy {
 
     @Override
     public WeightMap computeScores(Collection<HammerDb.Hit> hits, int len, double covg) {
-        double weight = len * covg / ClassStrategy.SCALE_FACTOR;
+        double weight = this.getWeight(len, covg);
         WeightMap retVal = new WeightMap();
         for (var hit : hits)
             retVal.count(hit.getGenomeId(), weight);

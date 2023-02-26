@@ -23,7 +23,7 @@ class TestHammerKmers {
 
 
     @Test
-    void test() {
+    void testHammerKmers() {
         HammerKmers testH = new HammerKmers("fig|10.peg.20", seq1);
         assertThat(testH.getFid(), equalTo("fig|10.peg.20"));
         assertThat(testH.isInSequence("gtccaatggctatgtgttgc"), equalTo(true));

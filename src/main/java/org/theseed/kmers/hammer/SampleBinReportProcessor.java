@@ -60,6 +60,7 @@ import org.theseed.utils.ParseFailureException;
  * --seqBatch	maximum number of kilobases to process at one time (default 1000)
  * --diff		minimum number of additional hits for a region-based classification
  * --resume		name of an existing report file containing data from samples already run
+ * --unscaled	if specified, hit weights will not be scaled by length and coverage
  *
  * @author Bruce Parrello
  *
@@ -127,6 +128,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     /** name of previous report file */
     @Option(name = "--resume", metaVar = "binReport.old.tbl", usage = "if specified, the name of a previous report containing results for samples that do not need to be rerun")
     private File resumeFile;
+
+    /** scale-suppression flag */
+    @Option(name = "--unscaled", usage = "if specified, hit weights will NOT be scaled by length and coverage")
+    private boolean unScaled;
 
     /** input sample group directory (or file) */
     @Argument(index = 0, metaVar = "inDir", usage = "input sample group directory (or file for certain types)",
@@ -455,6 +460,11 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Override
     public int getMinDiff() {
         return this.minDiff;
+    }
+
+    @Override
+    public boolean isScaled() {
+        return ! this.unScaled;
     }
 
 
