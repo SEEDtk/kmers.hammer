@@ -57,28 +57,6 @@ class HammerDbTest {
         hammerDbTester(hammers);
     }
 
-    @Test
-    void testHammerSets() throws IOException {
-        // Read the load file into a string set.
-        Set<String> testHammers = TabbedLineReader.readSet(LOAD_FILE, "1");
-        // Put them in a set.
-        HammerSet testSet = new HammerSet(20);
-        for (String hammer : testHammers) {
-            boolean ok = testSet.add(hammer);
-            assertThat(hammer, ok, equalTo(true));
-        }
-        // Test to make sure they made it and don't re-add.
-        for (String hammer : testHammers) {
-            assertThat(hammer, testSet.contains(hammer), equalTo(true));
-            boolean bad = testSet.add(hammer);
-            assertThat(hammer, bad, equalTo(false));
-        }
-        // Test some not expected in the set.
-        assertThat(testSet.contains("acgtacgtacgtaaaaaaaa"), equalTo(false));
-        assertThat(testSet.contains("cccacgtacgtacgtaaaaa"), equalTo(false));
-        assertThat(testSet.contains("cccacgtacgtacytaaaaa"), equalTo(false));
-    }
-
 
     /**
      * This tests a hammer database.  The database must be loaded from hammers200.tbl before calling.

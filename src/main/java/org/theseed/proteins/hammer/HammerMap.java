@@ -4,7 +4,10 @@
 package org.theseed.proteins.hammer;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -22,7 +25,9 @@ import org.slf4j.LoggerFactory;
  * @author Bruce Parrello
  *
  */
-public class HammerMap<T> {
+public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
+
+
 
     // FIELDS
     /** logging facility */
@@ -112,8 +117,8 @@ public class HammerMap<T> {
         private int size;
         /** desired maximum capacity for this sub-hash, or 0 if it should be allowed to grow unlimited */
         private int maxCapacity;
-        /** array of synonym chains */
-        private ArrayList<Node> table;
+        /** array of synonym chains; we use an object array because Node is generic */
+        private Object[] table;
 
         /**
          * Construct a new, empty subhash.
@@ -121,7 +126,7 @@ public class HammerMap<T> {
         protected SubHash() {
             this.size = 0;
             this.maxCapacity = START_MAX;
-            this.table = new ArrayList<Node>(START_SIZE);
+            this.table = new Object[START_SIZE];
         }
 
         /**
@@ -129,6 +134,13 @@ public class HammerMap<T> {
          */
         protected int size() {
             return this.size;
+        }
+
+        /**
+         * @return the number of synonym chains in this sub-hash
+         */
+        private int capacity() {
+            return this.table.length;
         }
 
         /**
@@ -141,10 +153,20 @@ public class HammerMap<T> {
          * @return the node found, or NULL if it is not present
          */
         private Node findMatch(long code, int subIdx) {
-            Node retVal = this.table.get(subIdx);
+            Node retVal = this.getChain(subIdx);
             while (retVal != null && ! retVal.matches(code))
                 retVal = retVal.getNextNode();
             return retVal;
+        }
+
+        /**
+         * @return the head of the synonym chain at the specified index, or NULL if the chain is empty
+         *
+         * @param subIdx	index of desired chain
+         */
+        @SuppressWarnings("unchecked")
+        private Node getChain(int subIdx) {
+            return (Node) this.table[subIdx];
         }
 
         /**
@@ -171,15 +193,12 @@ public class HammerMap<T> {
          *
          * @param subIdx	index of the synonym chain for the node
          * @param newNode	node to add
-         *
-         * @return the next node in the original synonym chain, or NULL if we are at the end
          */
-        private Node addNode(int subIdx, Node newNode) {
-            Node retVal = table.get(subIdx);
-            newNode.setNextNode(retVal);
-            table.set(subIdx, newNode);
+        private void addNode(int subIdx, Node newNode) {
+            Node newNext = this.getChain(subIdx);
+            newNode.setNextNode(newNext);
+            this.table[subIdx] = newNode;
             this.size++;
-            return retVal;
         }
 
         /**
@@ -187,22 +206,27 @@ public class HammerMap<T> {
          */
         private void expand() {
             // Compute the new maximum capacity.
-            long newSize = ((long) this.table.size()) * 2 + 1;
+            long newSize = ((long) this.capacity()) * 2 + 1;
             if (newSize > Integer.MAX_VALUE) {
                 // We can't expand.  Insure we stop trying.
                 this.maxCapacity = 0;
             } else {
                 // Create the bigger array.
                 var oldTable = this.table;
-                this.table = new ArrayList<Node>((int) newSize);
+                this.table = new Object[(int) newSize];
+                this.maxCapacity = (int) (newSize * LOAD_FACTOR);
                 // Reset ourselves to empty, as we are going to be re-inserting everything.
                 this.size = 0;
                 // Loop through the table, copying synonym chains.
-                for (Node oldNode : oldTable) {
+                for (int i = 0; i < oldTable.length; i++) {
+                    @SuppressWarnings("unchecked")
+                    Node oldNode = (Node) oldTable[i];
                     // Loop through the synonym chain, copying to the new table.
                     while (oldNode != null) {
                         int subIdx = this.getSubIdx(oldNode.hammerCode);
-                        oldNode = this.addNode(subIdx, oldNode);
+                        Node nextNode = oldNode.getNextNode();
+                        this.addNode(subIdx, oldNode);
+                        oldNode = nextNode;
                     }
                 }
             }
@@ -214,7 +238,121 @@ public class HammerMap<T> {
          * @param code	encoded hammer
          */
         private int getSubIdx(long code) {
-            return (int) (code & LOWER_BIT_MASK) % this.table.size();
+            return (int) (code & LOWER_BIT_MASK) % this.capacity();
+        }
+
+        /**
+         * Remove the specified hammer from this hash, and return its value.
+         *
+         * @param code	encoded hammer to remove
+         *
+         * @return the value of the hammer, or NULL if it is not found
+         */
+        public T remove(long code) {
+            T retVal = null;
+            int subIdx = this.getSubIdx(code);
+            Node curr = this.getChain(subIdx);
+            if (curr.matches(code)) {
+                // The first node is us (the most common case), so we simply replace it
+                // with its successor.
+                this.table[subIdx] = curr.getNextNode();
+                retVal = curr.getValue();
+            } else {
+                // Search for this hammer in the chain.
+                Node prev = curr;
+                curr = curr.nextNode;
+                while (curr != null && ! curr.matches(code)) {
+                    prev = curr;
+                    curr = curr.getNextNode();
+                }
+                if (curr != null) {
+                    // Here we found a match.
+                    prev.setNextNode(curr.getNextNode());
+                    retVal = curr.getValue();
+                }
+            }
+            return retVal;
+        }
+
+    }
+
+    /**
+     * This class implements an iterator through the hash.  Terrible things will happen
+     * if the hash is modified while iterating.
+     */
+    public class Iter implements Iterator<Entry<String, T>> {
+
+        /** current sub-hash */
+        private SubHash subHash;
+        /** index of next sub-hash */
+        private int mainIdx;
+        /** index of next table entry in sub-hash */
+        private int subIdx;
+        /** next node to return */
+        private Node next;
+
+        /**
+         * Initialize this iterator.
+         */
+        public Iter() {
+            // Position on the first chain in the first sub-hash.
+            this.subHash = HammerMap.this.hammerMap.get(0);
+            this.subIdx = 0;
+            // Denote the next sub-hash will be the second one.
+            this.mainIdx = 1;
+            // Denote we do not have a next-node yet.
+            this.next = null;
+            // Find the first nonempty chain.
+            this.findNextChain();
+        }
+
+        /**
+         * Position on the first node in the next non-empty chain
+         * in the map.
+         */
+        private void findNextChain() {
+            final int n = HammerMap.this.hammerMap.size();
+            // Scan the current subhash for a nonempty chain.
+            this.scanSubHash();
+            // If we did not find anything, loop until we do find
+            // something or we run out of subhashes.
+            while (this.next == null && this.mainIdx < n) {
+                // Get the next sub-hash.
+                this.subHash = HammerMap.this.hammerMap.get(this.mainIdx);
+                this.mainIdx++;
+                this.subIdx = 0;
+                // Scan it for a nonempty chain.
+                this.scanSubHash();
+            }
+        }
+
+        /**
+         * Scan the current subhash for the next non-empty chain.
+         */
+        private void scanSubHash() {
+            final int n = this.subHash.capacity();
+            while (this.subIdx < n && this.next == null) {
+                this.next = this.subHash.getChain(this.subIdx);
+                this.subIdx++;
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return this.next != null;
+        }
+
+        @Override
+        public Entry<String, T> next() {
+            if (this.next == null)
+                throw new NoSuchElementException("Attempt to read past end of hammer map.");
+            var retVal = this.next;
+            // Read ahead to the next node.  This tells us if there is one, and preps us
+            // for our next iteration.
+            this.next = retVal.getNextNode();
+            if (this.next == null)
+                this.findNextChain();
+            return retVal;
         }
 
     }
@@ -292,7 +430,7 @@ public class HammerMap<T> {
         this.kmerSize = kmerSize;
         // Determine how big a level-1 array we need.
         int highLetters = kmerSize - LOWER_CHARS;
-        int level1Size = (highLetters <= 0 ? 1 : 1 << highLetters);
+        int level1Size = (highLetters <= 0 ? 1 : 1 << (highLetters * 2));
         // Create the level-1 array.
         this.hammerMap = new ArrayList<SubHash>(level1Size);
         for (int i = 0; i < level1Size; i++)
@@ -364,19 +502,21 @@ public class HammerMap<T> {
             throw new IllegalArgumentException("Invalid hammer \"" + hammer + "\" specified.");
         SubHash subHash = this.getSubHash(code);
         int subIdx = subHash.getSubIdx(code);
-        Node nodeFound = subHash.findMatch(code, subIdx);
-        if (nodeFound == null) {
-            subHash.addInternal(code, subIdx, value);
-            retVal = true;
-        } else {
-            nodeFound.setValue(value);
-            retVal = false;
+        synchronized (subHash) {
+            Node nodeFound = subHash.findMatch(code, subIdx);
+            if (nodeFound == null) {
+                subHash.addInternal(code, subIdx, value);
+                retVal = true;
+            } else {
+                nodeFound.setValue(value);
+                retVal = false;
+            }
         }
         return retVal;
     }
 
     /**
-     * Get a hammer's value from the map, inserting it if it is new.
+     * Get a hammer's value from the map, inserting it if it is new and updating it if it already exists.
      *
      * @param hammer		hammer of interest
      * @param oldFunction	operation to update the value if it is found (NULL to do nothing)
@@ -384,22 +524,24 @@ public class HammerMap<T> {
      *
      * @return the value of the desired hammer
      */
-    public T getConditional(String hammer, Consumer<T> oldConsumer, Function<String, ? extends T> newFunction) {
+    public T getUpdate(String hammer, Consumer<T> oldConsumer, Function<String, ? extends T> newFunction) {
         T retVal;
         long code = this.encode(hammer);
         if (code < 0)
-            retVal = null;
+            throw new IllegalArgumentException("Invalid hammer \"" + hammer + "\" specified.");
         else {
             SubHash subHash = this.getSubHash(code);
             int subIdx = subHash.getSubIdx(code);
-            Node nodeFound = subHash.findMatch(code, subIdx);
-            if (nodeFound == null) {
-                retVal = newFunction.apply(hammer);
-                subHash.addInternal(code, subIdx, retVal);
-            } else {
-                retVal = nodeFound.getValue();
-                if (oldConsumer != null)
-                    oldConsumer.accept(retVal);
+            synchronized (subHash) {
+                Node nodeFound = subHash.findMatch(code, subIdx);
+                if (nodeFound == null) {
+                    retVal = newFunction.apply(hammer);
+                    subHash.addInternal(code, subIdx, retVal);
+                } else {
+                    retVal = nodeFound.getValue();
+                    if (oldConsumer != null)
+                        oldConsumer.accept(retVal);
+                }
             }
         }
         return retVal;
@@ -411,8 +553,89 @@ public class HammerMap<T> {
      * @param code	encoded hammer (MUST be >= 0)
      */
     private SubHash getSubHash(long code) {
-        int idx = (int) (code) >> LOWER_BITS;
+        int idx = (int) (code >>> LOWER_BITS);
         return this.hammerMap.get(idx);
+    }
+
+    /**
+     * Remove a hammer from the hash.
+     *
+     * @param hammer	hammer to be removed
+     *
+     * @return the value of the hammer, or NULL if the hammer was not in the hash
+     */
+    public T remove(String hammer) {
+        T retVal = null;
+        long code = this.encode(hammer);
+        if (code >= 0) {
+            SubHash subHash = this.getSubHash(code);
+            synchronized (subHash) {
+                retVal = subHash.remove(code);
+            }
+        }
+        return retVal;
+    }
+
+    /**
+     * @return the number of hammers in the map
+     */
+    public long size() {
+        long retVal = 0;
+        for (SubHash subHash : this.hammerMap)
+            retVal += subHash.size();
+        return retVal;
+    }
+
+    /**
+     * @return the mean length of an occupied chain
+     */
+    public double overloadFactor() {
+        long totalLength = 0;
+        int chains = 0;
+        for (SubHash subHash : this.hammerMap) {
+            final int n = subHash.capacity();
+            for (int i = 0; i < n; i++) {
+                Node node = subHash.getChain(i);
+                if (node != null) {
+                    chains++;
+                    while (node != null) {
+                        totalLength++;
+                        node = node.getNextNode();
+                    }
+                }
+            }
+        }
+        double retVal = 0.0;
+        if (chains > 0)
+            retVal = ((double) totalLength) / chains;
+        return retVal;
+    }
+
+    /**
+     * @return the ratio of occupied chains to chain slots
+     */
+    public double loadFactor() {
+        int chains = 0;
+        long buckets = 0;
+        for (SubHash subHash : this.hammerMap) {
+            final int n = subHash.capacity();
+            for (int i = 0; i < n; i++) {
+                Node node = subHash.getChain(i);
+                buckets++;
+                if (node != null)
+                    chains++;
+            }
+        }
+        double retVal = 0.0;
+        if (buckets > 0)
+            retVal = chains / (double) buckets;
+        return retVal;
+    }
+
+
+    @Override
+    public Iterator<Map.Entry<String, T>> iterator() {
+        return this.new Iter();
     }
 
 }
