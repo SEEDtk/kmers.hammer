@@ -74,13 +74,13 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     /** maximum repeat count */
     private int maxRepeatCount;
     /** number of hammers scanned from representative genomes */
-    private int repScanCount;
+    private long repScanCount;
     /** number of hammers rejected due to low complexity */
-    private int rejectCount;
+    private long rejectCount;
     /** number of hammers common between representatives */
-    private int conflictCount;
+    private long conflictCount;
     /** number of kmers scanned in neighbor genomes */
-    private int kmerCount;
+    private long kmerCount;
     /** hammer map used to accumulate potential hammers */
     private HammerMap<HammerScore> hammerMap;
 
@@ -231,6 +231,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      * @throws IOException
      */
     private Map<String, Map<String, String>> readSequences(File fastaFile, String roleId) throws IOException {
+        long lastMsg = System.currentTimeMillis();
         // Create the return map.  There will be one entry per genome in the system.
         var retVal = new HashMap<String, Map<String, String>>(this.genomeCount * 4 / 3 + 1);
         // Loop through the FASTA file.
@@ -245,8 +246,10 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 Map<String,String> gMap = retVal.computeIfAbsent(genomeId, x -> new TreeMap<String, String>());
                 gMap.put(fid, seq.getSequence());
                 inCount++;
-                if (log.isInfoEnabled() && inCount % 5000 == 0)
-                    log.info("{} sequences for role {} processed for {} genomes.", inCount, roleId, retVal.size());
+                if (log.isInfoEnabled() && System.currentTimeMillis() - lastMsg >= 5000) {
+                    log.info("{} sequences for role {} read for {} genomes.", inCount, roleId, retVal.size());
+                    lastMsg = System.currentTimeMillis();
+                }
             }
         }
         return retVal;
@@ -262,9 +265,9 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      */
     private void findHammers(String roleId, Map<String, Map<String, String>> sequenceMap) {
         // Create some counters.
-        int scanCount = 0;
-        int badCount = 0;
-        int commonCount = 0;
+        long scanCount = 0;
+        long badCount = 0;
+        long commonCount = 0;
         // Loop through the repgen genomes.  We need the genome ID and the neighbor set for each.
         for (var repEntry : this.neighborMap.entrySet()) {
             String repId = repEntry.getKey();
@@ -317,7 +320,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         // This timer is used to insure we get a message every 5 seconds.
         long lastMsg = System.currentTimeMillis();
         // Loop through all the genomes, counting the hammers in the non-representatives.
-        int kCount = 0;
+        long kCount = 0;
         for (var genomeEntry : sequenceMap.entrySet()) {
             String genomeId = genomeEntry.getKey();
             if (! this.neighborMap.containsKey(genomeId)) {
@@ -335,7 +338,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 }
             }
         }
-        log.info("{} kmers scanned for role {} in non-representative genomes.", kCount, roleId);
+        log.info("Total for role {}: {} kmers scanned from non-representative genomes.", roleId, kCount);
         // Update the counter.
         synchronized (this) {
             this.kmerCount += kCount;
@@ -361,12 +364,13 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      * @param writer	output file for the hammer list
      */
     private void writeHammers(PrintWriter writer) {
+        log.info("Writing output (this will take many minutes).");
         long hammersIn = 0;
         long lowPrec = 0;
         long lowWorth = 0;
         long hammersOut = 0;
         // Write the output header.
-        writer.println("hammer\tfid\tstrength\tprecision\tworth\thits");
+        writer.println("hammer\tfid\tstrength\tprecision\tworth\thits\trole");
         // Loop through the hammers in the hammer map.
         for (var hammerEntry : this.hammerMap) {
             String hammer = hammerEntry.getKey();
@@ -385,7 +389,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 else {
                     // Here we have a good hammer.
                     writer.println(hammer + "\t" + fid + "\t" + score.getStrength() + "\t"
-                            + precision + "\t" + worth + "\t" + score.getGoodHits());
+                            + precision + "\t" + worth + "\t" + score.getGoodHits() + "\t"
+                            + score.getRoleId());
                     hammersOut++;
                 }
             }

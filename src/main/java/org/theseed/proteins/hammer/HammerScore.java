@@ -143,7 +143,7 @@ public class HammerScore {
     /**
      * @return the ID of the hammer's role
      */
-    protected String getRoleId() {
+    public String getRoleId() {
         return this.roleId;
     }
 
