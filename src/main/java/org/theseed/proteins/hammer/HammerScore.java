@@ -5,15 +5,11 @@ package org.theseed.proteins.hammer;
 
 import java.util.Set;
 
-import org.theseed.genome.Feature;
-
 /**
  * This object is used to help score hammers being created using a protein finder.  It tells us
  * its source feature ID, and the good and bad hit counts.  Each hit count represents a single
- * neighbor (good) or distant (bad) genome.  Programs that use this object are required to
- * process sequences in genome order, so that all potential hammers in one genome are processed
- * before those in the next genome.  The object stores the ID of the last genome counted.  If
- * the current hit is from the same genome, the counters are not updated.
+ * neighbor (good) or distant (bad) genome.  Each hammer is only processed once per genome per
+ * role.  If a hammer is found in multiple roles, it is marked as bad.
  *
  * @author Bruce Parrello
  *
@@ -23,70 +19,61 @@ public class HammerScore {
     // FIELDS
     /** source feature ID */
     private String fid;
-    /** ID of last genome processed */
-    private String lastGenome;
+    /** role for this hammer */
+    private String roleId;
     /** neighbor set for this hammer's source genome (including the source itself) */
     private Set<String> neighborhood;
     /** number of neighborhood hits */
     private int goodHits;
     /** number of foreign hits */
     private int badHits;
-    /** total number of genomes in the master database */
-    private static int totalGenomes = 0;
+    /** TRUE if the hammer is invalid (found in multiple repgens), else FALSE */
+    private boolean badHammer;
     /** mean neighborhood size */
     private static double NORMAL_NEIGHBORHOOD = 42.0;
+    /** total number of genomes in the system */
+    private static int totalGenomes;
 
     /**
      * Construct a new hammer scoring object.
      *
      * @param fid			source feature for the hammer
+     * @param role			ID of the role for the hammer
      * @param neighborSet	ID set for the source genome's neighborhood
+     * @param badFlag		initial value for the bad-hammer flag
      */
-    public HammerScore(String fid, Set<String> neighborSet) {
+    public HammerScore(String fid, String role, Set<String> neighborSet, boolean badFlag) {
         this.fid = fid;
         this.neighborhood = neighborSet;
-        this.lastGenome = "";
-        // We start with 1 good hit from the originating representative genome.  There are no bad hits.
-        // A hammer with a bad hit in the repgen set is deleted from the potential-hammer set immediately.
+        this.badHammer = badFlag;
+        this.roleId = role;
+        // There is one good hit for the representative genome where we found the hammer, and no bad hits.
         this.goodHits = 1;
         this.badHits = 0;
     }
 
     /**
-     * Record a collision with this hammer.
+     * Specify the total number of genomes in the system.
      *
-     * @param fid	ID of the colliding feature's genome
-     */
-    public void recordHit(String genomeId) {
-        if (! genomeId.contentEquals(this.lastGenome)) {
-            // Here we need to count the hit.
-            if (this.neighborhood.contains(genomeId))
-                this.goodHits++;
-            else
-                this.badHits++;
-            // Insure this genome isn't counted again.
-            this.lastGenome = genomeId;
-        }
-    }
-
-    /**
-     * @return TRUE if the specified feature is in a different genome from this hammer, else FALSE
-     *
-     * @param fid2	ID of hammer's alternative source feature
-     */
-    public boolean isDisqualifyingHit(String fid2) {
-        boolean retVal = ! (Feature.genomeOf(this.fid).contentEquals(Feature.genomeOf(fid2)));
-        return retVal;
-    }
-
-    /**
-     * Specify the total number of genomes being scanned.  This is
-     * determined once at the beginning of the run.
-     *
-     * @param total		total number of genomes being scanned
+     * @param total		value to specify
      */
     public static void setTotalGenomes(int total) {
         totalGenomes = total;
+    }
+
+    /**
+     * Record a hit with this hammer.
+     *
+     * @param fid		ID of the colliding feature's genome
+     * @param role		ID of the role in which the hammer was found
+     */
+    public synchronized void recordHit(String genomeId, String role) {
+        if (! this.roleId.contentEquals(role))
+            this.badHammer = false;
+        else if (this.neighborhood.contains(genomeId))
+            this.goodHits++;
+        else
+            this.badHits++;
     }
 
     /**
@@ -97,8 +84,8 @@ public class HammerScore {
         if (this.badHits == 0)
             retVal = 1.0;
         else {
-            int distantGenomes = totalGenomes - this.neighborhood.size();
-            retVal = (distantGenomes - this.badHits) / (double) distantGenomes;
+            int distantGenomes = (totalGenomes - this.neighborhood.size());
+            retVal = (distantGenomes - this.badHits) / (double) (distantGenomes);
         }
         return retVal;
     }
@@ -138,5 +125,27 @@ public class HammerScore {
     public int getGoodHits() {
         return this.goodHits;
     }
+
+    /**
+     * @return TRUE if this hammer was found in more than one representative
+     */
+    public boolean isBadHammer() {
+        return this.badHammer;
+    }
+
+    /**
+     * Soecify that this hammer is bad.
+     */
+    public void setBadHammer() {
+        this.badHammer = true;
+    }
+
+    /**
+     * @return the ID of the hammer's role
+     */
+    protected String getRoleId() {
+        return this.roleId;
+    }
+
 
 }

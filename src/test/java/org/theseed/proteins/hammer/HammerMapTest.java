@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -33,6 +34,21 @@ class HammerMapTest {
             this.fid = id;
             this.count = 1;
         }
+    }
+
+    @Test
+    void testBaseCounts() {
+        Map<String, Integer> testMap = Map.of(
+                "acgtacgtacgtac", 		 4,
+                "acggtacggtaacggtacgt",	 7,
+                "cccccccccc",			10,
+                "acgtxACGTGAGC",		 4
+        );
+        for (var testEntry : testMap.entrySet()) {
+            int count = HammerMap.commonBaseCount(testEntry.getKey());
+            assertThat(testEntry.getKey(), count, equalTo(testEntry.getValue()));
+        }
+
     }
 
     @Test
@@ -105,7 +121,7 @@ class HammerMapTest {
         assertThat(found, equalTo(6));
         final String ILLEGAL_HAMMER = "angtacgtacgtacgtacgt";
         assertThrows(IllegalArgumentException.class, () -> testMap.put(ILLEGAL_HAMMER, "illegal hammer"));
-        assertThrows(IllegalArgumentException.class, () -> testMap.getUpdate(ILLEGAL_HAMMER, null, x -> x + " hammer"));
+        assertThrows(IllegalArgumentException.class, () -> testMap.update(ILLEGAL_HAMMER, null, x -> x + " hammer"));
     }
 
     @Test
@@ -129,12 +145,15 @@ class HammerMapTest {
             Thing testThing = testMap.get(hammer);
             assertThat(testThing.fid, equalTo(checkEntry.getValue()));
         }
-        Thing thing = testMap.getUpdate("acgtacgtacgtaaccggtt", x -> x.count++, x -> new Thing(x));
+        boolean newKey = testMap.update("acgtacgtacgtaaccggtt", x -> x.count++, x -> new Thing(x));
+        assertThat(newKey, equalTo(true));
+        Thing thing = testMap.get("acgtacgtacgtaaccggtt");
         assertThat(thing.count, equalTo(1));
-        assertThat(testMap.get("acgtacgtacgtaaccggtt"), sameInstance(thing));
         Thing original = testMap.get("aaccttttaggtgtggaaaa");
         assertThat(original.count, equalTo(1));
-        thing = testMap.getUpdate("aaccttttaggtgtggaaaa", x -> x.count++, x -> new Thing(x));
+        newKey = testMap.update("aaccttttaggtgtggaaaa", x -> x.count++, x -> new Thing(x));
+        assertThat(newKey, equalTo(false));
+        thing = testMap.get("aaccttttaggtgtggaaaa");
         assertThat(thing, sameInstance(original));
         assertThat(thing.count, equalTo(2));
     }

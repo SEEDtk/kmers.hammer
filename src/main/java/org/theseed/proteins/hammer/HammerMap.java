@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
 
 
-
     // FIELDS
     /** logging facility */
     protected static Logger log = LoggerFactory.getLogger(HammerMap.class);
@@ -396,7 +395,6 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
         return retVal;
     }
 
-
     /**
      * Decode a hammer from a long integer.
      *
@@ -417,6 +415,38 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
             }
             retVal = String.valueOf(buffer);
         }
+        return retVal;
+    }
+
+    /**
+     * @return the number of occurrences of the most common base pair in a sequence
+     */
+    public static int commonBaseCount(String seq) {
+        // Here we count on the fact the array is pre-filled with zeros.
+        int[] counts = new int[4];
+        for (int i = 0; i < seq.length(); i++) {
+            switch (seq.charAt(i)) {
+            case 'A' :
+            case 'a' :
+                counts[0]++;
+                break;
+            case 'C' :
+            case 'c' :
+                counts[1]++;
+                break;
+            case 'G' :
+            case 'g' :
+                counts[2]++;
+                break;
+            case 'T' :
+            case 't' :
+                counts[3]++;
+                break;
+            }
+        }
+        int retVal = counts[0];
+        for (int i = 1; i < 4; i++)
+            if (counts[i] > retVal) retVal = counts[i];
         return retVal;
     }
 
@@ -516,16 +546,16 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
     }
 
     /**
-     * Get a hammer's value from the map, inserting it if it is new and updating it if it already exists.
+     * Insert a hammer and its value in the map, or update the value if it is already present.
      *
      * @param hammer		hammer of interest
      * @param oldFunction	operation to update the value if it is found (NULL to do nothing)
      * @param newFunction	function to create the value if it is not found
      *
-     * @return the value of the desired hammer
+     * @return TRUE if we created the value, FALSE if we simply updated it
      */
-    public T getUpdate(String hammer, Consumer<T> oldConsumer, Function<String, ? extends T> newFunction) {
-        T retVal;
+    public boolean update(String hammer, Consumer<T> oldConsumer, Function<String, ? extends T> newFunction) {
+        boolean retVal;
         long code = this.encode(hammer);
         if (code < 0)
             throw new IllegalArgumentException("Invalid hammer \"" + hammer + "\" specified.");
@@ -535,12 +565,13 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
             synchronized (subHash) {
                 Node nodeFound = subHash.findMatch(code, subIdx);
                 if (nodeFound == null) {
-                    retVal = newFunction.apply(hammer);
-                    subHash.addInternal(code, subIdx, retVal);
+                    T newValue = newFunction.apply(hammer);
+                    subHash.addInternal(code, subIdx, newValue);
+                    retVal = true;
                 } else {
-                    retVal = nodeFound.getValue();
+                    retVal = false;
                     if (oldConsumer != null)
-                        oldConsumer.accept(retVal);
+                        oldConsumer.accept(nodeFound.getValue());
                 }
             }
         }

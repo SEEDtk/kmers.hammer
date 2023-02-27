@@ -7,9 +7,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import org.kohsuke.args4j.Argument;
@@ -18,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.genome.Feature;
 import org.theseed.io.TabbedLineReader;
+import org.theseed.proteins.hammer.HammerMap;
 import org.theseed.proteins.hammer.HammerScore;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.KmerSeries;
@@ -50,7 +54,8 @@ import org.theseed.utils.ParseFailureException;
  * --minWorth	minimum worthiness fraction for an acceptable hammer (default 0.00)
  * --minPrec	minimum precision fraction for an acceptable hammer (default 0.90)
  * --minSize	minimum size for a neighborhood to be hammer-worthy (default 1)
- * --temp		name of a temporary directory for working files (default "Temp" in the current directory)
+ * --maxRepeat	maximum percent of a hammer that can belong to a single base pair type (default 0.70)
+ * --para		if specified, parallel processing will be used, which increases memory size but improves performance
  *
  * @author Bruce Parrello
  *
@@ -64,14 +69,20 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     private ProteinFinder finder;
     /** map of repgen genomes to neighbor sets */
     private Map<String, Set<String>> neighborMap;
-    /** hammer scoring map */
-    private Map<String, HammerScore> hammerMap;
-    /** two-level map from genomeId -> featureID -> feature DNA for all sequences of the current role */
-    private Map<String, Map<String, String>> sequenceMap;
     /** total number of genomes in the finder */
     private int genomeCount;
-    /** ID of the current role */
-    private String roleId;
+    /** maximum repeat count */
+    private int maxRepeatCount;
+    /** number of hammers scanned from representative genomes */
+    private int repScanCount;
+    /** number of hammers rejected due to low complexity */
+    private int rejectCount;
+    /** number of hammers common between representatives */
+    private int conflictCount;
+    /** number of kmers scanned in neighbor genomes */
+    private int kmerCount;
+    /** hammer map used to accumulate potential hammers */
+    private HammerMap<HammerScore> hammerMap;
 
     // COMMAND-LINE OPTIONS
 
@@ -91,6 +102,14 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     @Option(name = "--minSize", metaVar = "50", usage = "minimum neighborhood size for a representative")
     private int minPeers;
 
+    /** maximum fraction of a hammer allowed for a particular nucleotide */
+    @Option(name = "--maxRepeat", metaVar = "0.60", usage = "maximum fraction of a hammer allowed for any one nucleotide type")
+    private double maxRepeat;
+
+    /** if specified, parallel processing will be used */
+    @Option(name = "--para", usage = "if specified, parallel processing will be used")
+    private boolean paraFlag;
+
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
     private File finderDir;
@@ -102,6 +121,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         this.minPrec = 0.9;
         this.minWorth = 0.0;
         this.minPeers = 1;
+        this.maxRepeat = 0.70;
+        this.paraFlag = false;
     }
 
     @Override
@@ -116,6 +137,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             throw new FileNotFoundException("Finder directory " + this.finderDir + " is not found or invalid.");
         if (this.minPeers <= 0)
             throw new ParseFailureException("Minimum neighborhood size must be positive.");
+        if (this.maxRepeat <= 0.25 || this.maxRepeat > 1.0)
+            throw new ParseFailureException("Maximum repeat fraction must be between 0.25 and 1.0.");
         log.info("Loading protein-finder from {}.", this.finderDir);
         this.finder = new ProteinFinder(this.finderDir);
     }
@@ -138,46 +161,80 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             this.genomeCount++;
         }
         log.info("{} genomes sorted into {} neighborhoods.", this.genomeCount, this.neighborMap.size());
-        // Insure the hammer scoring system has the total genome count.
         HammerScore.setTotalGenomes(this.genomeCount);
     }
 
     @Override
     protected void runPipeline(TabbedLineReader inputStream, PrintWriter writer) throws Exception {
-        // Write the output header.
-        writer.println("hammer\tfid\tstrength\tprecision\thits");
+        // Compute the repeat-count limit.  A value greater than this will cause the hammer to be
+        // discarded.
+        this.maxRepeatCount = (int) (this.maxRepeat * this.kmerSize);
+        // Initialize the counters.
+        this.repScanCount = 0;
+        this.rejectCount = 0;
+        this.conflictCount = 0;
+        this.kmerCount = 0;
+        // Create the master hammer map.
+        this.hammerMap = new HammerMap<HammerScore>(this.kmerSize);
         // Now we are ready to begin.  For each role, we load all the sequences into memory, grouped
         // by representative genome.
         var fastaFileMap = this.finder.getFastas();
-        for (var fastaEntry : fastaFileMap.entrySet()) {
-            this.roleId = fastaEntry.getKey();
-            File fastaFile = fastaEntry.getValue();
-            log.info("Processing hammers for role {} using {}.", this.roleId, fastaFile);
-            // Read all the sequences from the FASTA file into the sequence map.
-            this.sequenceMap = this.readSequences(fastaFile);
-            // Generate the potential hammers.
-            this.hammerMap = this.getPotentialHammers();
-            // Compute worthiness and precision.
-            this.analyzeHammers();
-            // Write the worthwhile hammers.
-            this.writeResults(writer);
+        var fastaStream = fastaFileMap.entrySet().parallelStream();
+        if (this.paraFlag)
+            fastaStream = fastaStream.parallel();
+        fastaStream.forEach(x -> this.processRole(x));
+        log.info("{} hammers scanned in {} representative genomes.  {} rejected due to low complexity, {} due to conflicts, {} kept.",
+                this.repScanCount, this.neighborMap.size(), this.rejectCount, this.conflictCount, this.hammerMap.size());
+        log.info("{} total kmers scanned in neighbor genomes.", this.kmerCount);
+        log.info("Hammer map has a load factor of {} and overload factor of {}.", this.hammerMap.loadFactor(),
+                this.hammerMap.overloadFactor());
+        // Now we write the results.
+        this.writeHammers(writer);
+    }
+
+    /**
+     * Process the hammers for a single role.
+     *
+     * @param fastaEntry	map entry containing the role ID and the role's finder FASTA file
+     *
+     */
+    private void processRole(Entry<String, File> fastaEntry) {
+        String roleId = fastaEntry.getKey();
+        File fastaFile = fastaEntry.getValue();
+        log.info("Processing hammers for role {} using {}.", roleId, fastaFile);
+        // Read all the sequences from the FASTA file into the sequence map.  We need to convert the IO
+        // exception so we can use this method in a stream.
+        Map<String, Map<String, String>> sequenceMap;
+        try {
+            sequenceMap = this.readSequences(fastaFile, roleId);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
+        // Now we have all the DNA sequences for this role in the sequence map, organized by genome ID.
+        // We run through all the repgens, storing the hammers in the map.  Then we run through all
+        // the others, counting the hits.  First, the repgens.
+        log.info("Scanning hammers for role {} in representative genomes.", roleId);
+        this.findHammers(roleId, sequenceMap);
+        // Now, the other genomes.
+        log.info("Counting hammer occurrences for role {} in non-representative genomes.", roleId);
+        this.countHammers(roleId, sequenceMap);
     }
 
     /**
      * Read the specified finder file and return all the sequences organized by genome.
      *
      * @param fastaFile		FASTA file of DNA sequences for the current role
+     * @param roleId		ID of the current role
      *
      * @return a map of feature IDs to sequences for each genome
      *
      * @throws IOException
      */
-    private Map<String, Map<String, String>> readSequences(File fastaFile) throws IOException {
+    private Map<String, Map<String, String>> readSequences(File fastaFile, String roleId) throws IOException {
         // Create the return map.  There will be one entry per genome in the system.
         var retVal = new HashMap<String, Map<String, String>>(this.genomeCount * 4 / 3 + 1);
         // Loop through the FASTA file.
-        log.info("Reading sequences from {} for role {}.", fastaFile, this.roleId);
+        log.info("Reading sequences from {} for role {}.", fastaFile, roleId);
         try (var inStream = new FastaInputStream(fastaFile)) {
             int inCount = 0;
             for (Sequence seq : inStream) {
@@ -189,128 +246,153 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 gMap.put(fid, seq.getSequence());
                 inCount++;
                 if (log.isInfoEnabled() && inCount % 5000 == 0)
-                    log.info("{} sequences processed for {} genomes.", inCount, retVal.size());
+                    log.info("{} sequences for role {} processed for {} genomes.", inCount, roleId, retVal.size());
             }
         }
         return retVal;
     }
 
     /**
-     * Compute the potential hammers.  We do this by scanning all the sequences belonging to one of the representative
-     * genomes (that is, the ones whose IDs are in the key set of the neighborhood map).  If a sequence is found in
-     * more than one such genome, it is removed from the map.  This is the method that provides the greatest memory
-     * strain.  All subsequent methods merely reduce the size of the hammer map.
+     * Find all the hammers in the representative genomes for the current finder.  A hammer that is already in the map for
+     * a different genome will automatically be marked bad.  Sequences that fail the complexity test will be skipped.
+     * There is no need to scan for ambiguity characters because the finder is built without them.
      *
-     * @return a map from potential hammers to scoring objects
+     * @param roleId		ID of the role being processed
+     * @param sequenceMap	two-level map from genome ID -> feature ID -> DNA sequence
      */
-    private Map<String, HammerScore> getPotentialHammers() {
-        // The potential hammers are stored in here.
-        Map<String, HammerScore> retVal = new HashMap<String, HammerScore>(this.neighborMap.size() * 4000);
-        // Common kmers are kept in here.
-        Set<String> commonSet = new HashSet<String>(this.neighborMap.size() * 150);
-        // Loop through the representatives.
+    private void findHammers(String roleId, Map<String, Map<String, String>> sequenceMap) {
+        // Create some counters.
+        int scanCount = 0;
+        int badCount = 0;
+        int commonCount = 0;
+        // Loop through the repgen genomes.  We need the genome ID and the neighbor set for each.
         for (var repEntry : this.neighborMap.entrySet()) {
             String repId = repEntry.getKey();
-            var repSequenceMap = this.sequenceMap.get(repId);
-            if (repSequenceMap != null) {
-                // Get the neighbor set.  We store it in the score objects.
-                Set<String> neighbors = repEntry.getValue();
-                log.info("Scanning representative genome {} with {} neighbors.", repId, neighbors.size() - 1);
-                // Loop through all the sequences for this representative.  We expect one, maybe two.
-                // Note that we don't check for ambiguity characters, since the finder is built without them.
-                int commonCount = 0;
-                int conflictCount = 0;
-                int kmerCount = 0;
-                for (var seqEntry : repSequenceMap.entrySet()) {
-                    String fid = seqEntry.getKey();
-                    KmerSeries kmers = new KmerSeries(seqEntry.getValue(), this.kmerSize);
-                    for (String kmer : kmers) {
-                        kmerCount++;
-                        if (commonSet.contains(kmer)) {
-                            // Here the kmer has already been identified as bad.
+            Set<String> neighbors = repEntry.getValue();
+            // If the neighborhood is too small, we have to remember all hammers as bad.
+            boolean alwaysBad = (neighbors.size() < this.minPeers);
+            // Does this repgen have sequences for this protein?
+            var fidMap = sequenceMap.get(repId);
+            if (fidMap != null) {
+                // Yes, it does. In almost every case, there will be a single feature in the finder for this genome.
+                // If there is more than one, we default to the first.
+                var fid = fidMap.keySet().iterator().next();
+                // Get all the kmers for this protein's sequences.
+                Set<String> kmers = this.getHammers(fidMap.values());
+                // For each kmer, if it is new, we add it as a hammer.  If it is old, we mark it as invalid.
+                // We must, however, check for low-complexity sequences.
+                for (String kmer : kmers) {
+                    scanCount++;
+                    int bestBaseCount = HammerMap.commonBaseCount(kmer);
+                    if (bestBaseCount > this.maxRepeatCount)
+                        badCount++;
+                    else {
+                        // Here the hamemr is valid.  Check it against the map.  If it already exists, remember it
+                        // as bad.  Otherwise, add it to the map.  Map updates are thread-safe, and even if we bad-flag
+                        // the score, it is the only operation allowed on that flag, so thread safety does not matter.
+                        boolean newHammer = this.hammerMap.update(kmer, x -> x.setBadHammer(),
+                                x -> new HammerScore(fid, roleId, neighbors, alwaysBad));
+                        if (!newHammer)
                             commonCount++;
-                        } else {
-                            HammerScore score = retVal.get(kmer);
-                            if (score == null) {
-                                // Here the kmer is new.  Add it to the return map.
-                                retVal.put(kmer, new HammerScore(fid, neighbors));
-                            } else if (score.isDisqualifyingHit(fid)) {
-                                // Here the kmer has been seen before in a different genome.
-                                retVal.remove(kmer);
-                                commonSet.add(kmer);
-                                conflictCount++;
-                            }
-                        }
                     }
                 }
-                log.info("{} kmers processed:  {} were common, {} conflicts found.", kmerCount, commonCount, conflictCount);
-                // Now delete the sequences for this rep genome.  We don't need them again.
-                this.sequenceMap.remove(repId);
             }
         }
-        log.info("{} potential kmers found for {}.", retVal.size(), this.roleId);
+        log.info("{} kmers scanned, {} rejected, {} in common for role {}.", scanCount, badCount, commonCount, roleId);
+        // Update the counters.
+        synchronized (this) {
+            this.repScanCount += scanCount;
+            this.rejectCount += badCount;
+            this.conflictCount += commonCount;
+        }
+    }
+
+    /**
+     * Count all the hammers in the represented genomes so we can determine the scores.
+     *
+     * @param roleId	ID of the role being processed
+     * @param sequenceMap	two-level map from genome ID -> feature ID -> DNA sequence
+     */
+    private void countHammers(String roleId, Map<String, Map<String, String>> sequenceMap) {
+        // This timer is used to insure we get a message every 5 seconds.
+        long lastMsg = System.currentTimeMillis();
+        // Loop through all the genomes, counting the hammers in the non-representatives.
+        int kCount = 0;
+        for (var genomeEntry : sequenceMap.entrySet()) {
+            String genomeId = genomeEntry.getKey();
+            if (! this.neighborMap.containsKey(genomeId)) {
+                // Here we are definitely not a representative genome.
+                Set<String> kmers = this.getHammers(genomeEntry.getValue().values());
+                for (String kmer : kmers) {
+                    kCount++;
+                    HammerScore score = this.hammerMap.get(kmer);
+                    if (score != null)
+                        score.recordHit(genomeId, roleId);
+                }
+                if (log.isInfoEnabled() && System.currentTimeMillis() - lastMsg >= 5000) {
+                    log.info("{} kmers scanned for role {}.", kCount, roleId);
+                    lastMsg = System.currentTimeMillis();
+                }
+            }
+        }
+        log.info("{} kmers scanned for role {} in non-representative genomes.", kCount, roleId);
+        // Update the counter.
+        synchronized (this) {
+            this.kmerCount += kCount;
+        }
+    }
+
+    /**
+     * @return the set of hammers in a group of sequences
+     *
+     * @param seq	group of sequences to scan
+     */
+    private Set<String> getHammers(Collection<String> seqs) {
+        Set<String> retVal = new HashSet<String>(seqs.size() * 1400);
+        KmerSeries kmers = new KmerSeries(seqs, this.kmerSize);
+        for (String kmer : kmers)
+            retVal.add(kmer);
         return retVal;
     }
 
     /**
-     * Now we score the hammers.  We run through ALL the sequences in genome order, updating the scores.
-     */
-    private void analyzeHammers() {
-        log.info("Scoring potential hammers for role {}.", this.roleId);
-        int seqCount = 0;
-        for (var genomeEntry : this.sequenceMap.entrySet()) {
-            String genomeId = genomeEntry.getKey();
-            for (String seq : genomeEntry.getValue().values()) {
-                KmerSeries kmers = new KmerSeries(seq, this.kmerSize);
-                for (String kmer : kmers) {
-                    HammerScore score = this.hammerMap.get(kmer);
-                    if (score != null)
-                        score.recordHit(genomeId);
-                }
-                seqCount++;
-                if (log.isInfoEnabled() && seqCount % 5000 == 0)
-                    log.info("{} sequences processed for role {}.", seqCount, this.roleId);
-            }
-        }
-    }
-
-    /**
-     * Here we output the hammers with their scores.
+     * Write the hammers to the output.  This method happens only once, so unlike the rest, it is not thread-safe.
      *
-     * @param writer	output writer for the report
+     * @param writer	output file for the hammer list
      */
-    private void writeResults(PrintWriter writer) {
-        int worthless = 0;
-        int imprecise = 0;
-        int kept = 0;
-        int lowSize = 0;
-        for (var hammerEntry : this.hammerMap.entrySet()) {
+    private void writeHammers(PrintWriter writer) {
+        long hammersIn = 0;
+        long lowPrec = 0;
+        long lowWorth = 0;
+        long hammersOut = 0;
+        // Write the output header.
+        writer.println("hammer\tfid\tstrength\tprecision\tworth\thits");
+        // Loop through the hammers in the hammer map.
+        for (var hammerEntry : this.hammerMap) {
             String hammer = hammerEntry.getKey();
             HammerScore score = hammerEntry.getValue();
-            String fid = score.getFid();
-            String genomeId = Feature.genomeOf(fid);
-            // We must insure the representative has a good neighborhood.
-            if (this.neighborMap.get(genomeId).size() < this.minPeers)
-                lowSize++;
-            else {
+            // Only proceed if the hammer is good.
+            if (! score.isBadHammer()) {
                 double worth = score.getWorthiness();
-                double strength = score.getStrength();
-                double prec = score.getPrecision();
+                double precision = score.getPrecision();
+                String fid = score.getFid();
+                hammersIn++;
+                // Filter out the hammers that aren't useful.
                 if (worth < this.minWorth)
-                    worthless++;
-                else if (prec < this.minPrec)
-                    imprecise++;
+                    lowWorth++;
+                else if (precision < this.minPrec)
+                    lowPrec++;
                 else {
-                    kept++;
-                    writer.println(hammer + "\t" + score.getFid() + "\t" + Double.toString(strength)
-                            + "\t" + Double.toString(prec) + "\t" + Integer.toString(score.getGoodHits()));
-                    if (log.isInfoEnabled() && kept % 30000 == 0)
-                        log.info("{} hammers output, {} unworthy, {} imprecise.", kept, worthless, imprecise);
+                    // Here we have a good hammer.
+                    writer.println(hammer + "\t" + fid + "\t" + score.getStrength() + "\t"
+                            + precision + "\t" + worth + "\t" + score.getGoodHits());
+                    hammersOut++;
                 }
             }
         }
-        log.info("{} hammers output, {} unworthy, {} imprecise, {} rejected for insufficient neighborhood.",
-                kept, worthless, imprecise, lowSize);
+        log.info("{} hammers checked, {} rejected due to low precision, {} due to low worth, {} output.",
+                hammersIn, lowPrec, lowWorth, hammersOut);
     }
+
 
 }
