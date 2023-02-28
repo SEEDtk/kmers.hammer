@@ -17,6 +17,7 @@ import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
 import org.theseed.proteins.Role;
 import org.theseed.proteins.RoleMap;
+import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.proteins.hammer.HammerDb.Source;
 import org.theseed.utils.ParseFailureException;
 
@@ -37,6 +38,8 @@ public abstract class HammerReport {
     private GenomeSource repGenomes;
     /** role definition map (if any) */
     private RoleMap roles;
+    /** main hammer database */
+    private HammerDb hammerDb;
 
     /**
      * This interface defines the methods that must be supported for a controlling command processor.
@@ -66,7 +69,15 @@ public abstract class HammerReport {
             public HammerReport create(IParms processor) throws ParseFailureException, IOException {
                 return new GenomeHammerReport(processor);
             }
-        };
+        },
+        /** validation report for the hammers */
+        VALIDATE {
+            @Override
+            public HammerReport create(IParms processor) throws ParseFailureException, IOException {
+                return new ValidationHammerReport(processor);
+            }
+        }
+        ;
 
         /**
          * @return a hammer report writer of this type
@@ -102,9 +113,11 @@ public abstract class HammerReport {
      * Initialize the report.
      *
      * @param repWriter		output stream for the report
+     * @param hammers		main hammer database
      */
-    public void openReport(PrintWriter repWriter) {
+    public void openReport(PrintWriter repWriter, HammerDb hammers) {
         this.writer = repWriter;
+        this.hammerDb = hammers;
         this.initReport();
 
     }
@@ -123,6 +136,13 @@ public abstract class HammerReport {
      */
     public synchronized void printFields(String... strings) {
         this.writer.println(StringUtils.join(strings, '\t'));
+    }
+
+    /**
+     * Flush the output stream.
+     */
+    public synchronized void flush() {
+        this.writer.flush();
     }
 
     /**
@@ -177,6 +197,13 @@ public abstract class HammerReport {
      */
     public boolean hasRoles() {
         return this.roles != null;
+    }
+
+    /**
+     * @return the hammer database for this report
+     */
+    public HammerDb getHammers() {
+        return this.hammerDb;
     }
 
 }

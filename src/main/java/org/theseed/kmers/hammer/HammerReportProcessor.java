@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -110,20 +111,27 @@ public class HammerReportProcessor extends BaseHammerUsageProcessor implements H
     @Override
     protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
         // Initialize the report.
-        this.reportWriter.openReport(writer);
+        this.reportWriter.openReport(writer, hammerDb);
         // Loop through the representative genomes.
-        int repCount = 0;
-        for (var repEntry : this.repGenomeMap.entrySet()) {
-            repCount++;
-            String repId = repEntry.getKey();
-            log.info("Processing representative {} of {}: {} ({})", repCount, this.repGenomeMap.size(), repId, repEntry.getValue());
-            Map<String, HammerDb.Source> hammerMap = hammerDb.findGenomeHammers(repId);
-            log.info("{} hammers found for {}.", hammerMap.size(), repId);
-            this.reportWriter.processGenome(repId, repEntry.getValue(), hammerMap);
-            writer.flush();
-        }
+        this.repGenomeMap.entrySet().parallelStream().forEach(x -> reportGenome(hammerDb, x));
         // Finish the report.
         this.reportWriter.closeReport();
+    }
+
+    /**
+     * Produce the report on a single representative genome's hammers.
+     *
+     * @param hammerDb		hammer database
+     * @param repEntry		map entry with rep genome ID and name
+     */
+    private void reportGenome(HammerDb hammerDb, Entry<String, String> repEntry) {
+        String repId = repEntry.getKey();
+        final String repName = repEntry.getValue();
+        log.info("Processing representative {} ({})", repId, repName);
+        Map<String, HammerDb.Source> hammerMap = hammerDb.findGenomeHammers(repId);
+        log.info("{} hammers found for {}.", hammerMap.size(), repId);
+        this.reportWriter.processGenome(repId, repName, hammerMap);
+        this.reportWriter.flush();
     }
 
     @Override

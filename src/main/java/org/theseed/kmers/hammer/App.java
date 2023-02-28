@@ -25,7 +25,7 @@ import org.theseed.utils.BaseProcessor;
  *  synthBins		produce a simulated bin report from a synthetic contig file
  *  binComp			do a comparison of bin reports
  *  filter			filter a hammer database by removing hammers in other genomes
- *  list			produce a report on a hammer database
+ *  report			produce a report on a hammer database
  *  trimCheck		produce a FASTA file by comparing trimmed and untrimmed reads
  *  contigHammers	produce a ljst of the hammers found in a contig file
  *  hammerStats		determine which hammers were found in a contig-hammer run and how many of each
@@ -93,7 +93,7 @@ public class App
         case "filter" :
             processor = new HammerFilterProcessor();
             break;
-        case "list" :
+        case "report" :
             processor = new HammerReportProcessor();
             break;
         case "trimCheck" :
