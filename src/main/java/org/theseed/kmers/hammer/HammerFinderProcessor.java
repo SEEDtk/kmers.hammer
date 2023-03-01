@@ -11,6 +11,7 @@ import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -19,7 +20,10 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.genome.Contig;
 import org.theseed.genome.Feature;
+import org.theseed.genome.Genome;
+import org.theseed.genome.iterator.GenomeSource;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerMap;
 import org.theseed.proteins.hammer.HammerScore;
@@ -50,12 +54,14 @@ import org.theseed.utils.ParseFailureException;
  * -i	input file containing the repgen list data (if not STDIN)
  * -o	output file for the hammer list (if not STDOUT)
  * -K	kmer size for a hammer (default 20)
+ * -t	type of genome source for the optional cleaning step (default DIR)
  *
  * --minWorth	minimum worthiness fraction for an acceptable hammer (default 0.00)
  * --minPrec	minimum precision fraction for an acceptable hammer (default 0.90)
  * --minSize	minimum size for a neighborhood to be hammer-worthy (default 1)
  * --maxRepeat	maximum percent of a hammer that can belong to a single base pair type (default 0.70)
  * --para		if specified, parallel processing will be used, which increases memory size but improves performance
+ * --clean		if specified, the name of a genome source for the representative genomes, to be used to clean the hammer set
  *
  * @author Bruce Parrello
  *
@@ -83,6 +89,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     private long kmerCount;
     /** hammer map used to accumulate potential hammers */
     private HammerMap<HammerScore> hammerMap;
+    /** genome source for representative genomes, or NULL if there is no cleaning step */
+    private GenomeSource repGenomes;
 
     // COMMAND-LINE OPTIONS
 
@@ -110,6 +118,14 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     @Option(name = "--para", usage = "if specified, parallel processing will be used")
     private boolean paraFlag;
 
+    /** if specified, the file or directory containing a representative genome source for cleaning */
+    @Option(name = "--clean", metaVar = "GTOXXX", usage = "if specified the file or directory containing the representative genomes for cleaning")
+    private File repDir;
+
+    /** type of genome source for the optional cleaning directory */
+    @Option(name = "--type", aliases = { "-t" }, usage = "type of genome source for optional cleaning genomes")
+    private GenomeSource.Type sourceType;
+
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
     private File finderDir;
@@ -123,6 +139,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         this.minPeers = 1;
         this.maxRepeat = 0.70;
         this.paraFlag = false;
+        this.repDir = null;
+        this.sourceType = GenomeSource.Type.DIR;
     }
 
     @Override
@@ -139,6 +157,15 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             throw new ParseFailureException("Minimum neighborhood size must be positive.");
         if (this.maxRepeat <= 0.25 || this.maxRepeat > 1.0)
             throw new ParseFailureException("Maximum repeat fraction must be between 0.25 and 1.0.");
+        // Set up the cleaning directory.
+        if (this.repDir == null) {
+            log.info("No cleaning step will be performed.");
+            this.repGenomes = null;
+        } else {
+            log.info("Hammers will be cleaned using representative genomes in {}.", this.repDir);
+            this.repGenomes = this.sourceType.create(this.repDir);
+        }
+        // Finally, set up the protein finder.
         log.info("Loading protein-finder from {}.", this.finderDir);
         this.finder = new ProteinFinder(this.finderDir);
     }
@@ -179,7 +206,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         // Now we are ready to begin.  For each role, we load all the sequences into memory, grouped
         // by representative genome.
         var fastaFileMap = this.finder.getFastas();
-        var fastaStream = fastaFileMap.entrySet().parallelStream();
+        var fastaStream = fastaFileMap.entrySet().stream();
         if (this.paraFlag)
             fastaStream = fastaStream.parallel();
         fastaStream.forEach(x -> this.processRole(x));
@@ -188,6 +215,17 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         log.info("{} total kmers scanned in neighbor genomes.", this.kmerCount);
         log.info("Hammer map has a load factor of {} and overload factor of {}.", this.hammerMap.loadFactor(),
                 this.hammerMap.overloadFactor());
+        if (this.repGenomes != null) {
+            // Here we have to clean the hammers.  We scan each representative genome, and delete any hammer found outside
+            // its target genome.
+            var repIdStream = this.neighborMap.keySet().stream();
+            if (this.paraFlag)
+                repIdStream.parallel();
+            int cleaned = repIdStream.mapToInt(x -> this.cleanHammers(x)).sum();
+            log.info("{} hammers were marked bad during cleaning.", cleaned);
+            log.info("Final hammer map has a load factor of {} and overload factor of {}.", this.hammerMap.loadFactor(),
+                    this.hammerMap.overloadFactor());
+        }
         // Now we write the results.
         this.writeHammers(writer);
     }
@@ -343,6 +381,41 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         synchronized (this) {
             this.kmerCount += kCount;
         }
+    }
+
+    /**
+     * This method scans a genome for hammers.  A hammer found in a genome that is different from its target
+     * genome is removed.
+     *
+     * @param repId		ID of the representative genome to scan
+     *
+     * @return the number of hammers marked bad
+     */
+    private int cleanHammers(String repId) {
+        Genome repGenome = this.repGenomes.getGenome(repId);
+        log.info("Scanning genome {} for cleaning step.", repGenome);
+        int retVal = 0;
+        // Scan all the contig sequences in both directions.
+        for (Contig contig : repGenome.getContigs()) {
+            String seq = contig.getSequence();
+            String rSeq = Contig.reverse(seq);
+            Set<String> hammers = this.getHammers(List.of(seq, rSeq));
+            for (String kmer : hammers) {
+                HammerScore score = this.hammerMap.get(kmer);
+                if (score != null) {
+                    // Here we have a hammer.  If it is invalid, remove it.
+                    if (score.isBadHammer() || ! repId.contentEquals(Feature.genomeOf(score.getFid()))) {
+                        HammerScore testScore = this.hammerMap.remove(kmer);
+                        // If the hammer was bad, we don't count it here.  If the remove returned NULL,
+                        // someone else got to this hammer first.
+                        if (! score.isBadHammer() && testScore != null)
+                            retVal++;
+                    }
+                }
+            }
+        }
+        log.info("{} hammers cleaned using {}.", retVal, repGenome);
+        return retVal;
     }
 
     /**

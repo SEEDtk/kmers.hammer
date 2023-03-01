@@ -247,7 +247,7 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
          *
          * @return the value of the hammer, or NULL if it is not found
          */
-        public T remove(long code) {
+        private T remove(long code) {
             T retVal = null;
             int subIdx = this.getSubIdx(code);
             Node curr = this.getChain(subIdx);
@@ -531,8 +531,10 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
         if (code < 0)
             throw new IllegalArgumentException("Invalid hammer \"" + hammer + "\" specified.");
         SubHash subHash = this.getSubHash(code);
-        int subIdx = subHash.getSubIdx(code);
+        // Here is where we make it all thread-safe.  We cannot do ANYTHING to the sub-hash unless
+        // it is locked to us.
         synchronized (subHash) {
+            int subIdx = subHash.getSubIdx(code);
             Node nodeFound = subHash.findMatch(code, subIdx);
             if (nodeFound == null) {
                 subHash.addInternal(code, subIdx, value);
@@ -561,8 +563,10 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
             throw new IllegalArgumentException("Invalid hammer \"" + hammer + "\" specified.");
         else {
             SubHash subHash = this.getSubHash(code);
-            int subIdx = subHash.getSubIdx(code);
+            // Here is where we make it all thread-safe.  We cannot do ANYTHING to the sub-hash unless
+            // it is locked to us.
             synchronized (subHash) {
+                int subIdx = subHash.getSubIdx(code);
                 Node nodeFound = subHash.findMatch(code, subIdx);
                 if (nodeFound == null) {
                     T newValue = newFunction.apply(hammer);

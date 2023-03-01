@@ -27,7 +27,6 @@ import org.theseed.utils.BaseProcessor;
  *  filter			filter a hammer database by removing hammers in other genomes
  *  report			produce a report on a hammer database
  *  trimCheck		produce a FASTA file by comparing trimmed and untrimmed reads
- *  contigHammers	produce a ljst of the hammers found in a contig file
  *  hammerStats		determine which hammers were found in a contig-hammer run and how many of each
  */
 public class App
