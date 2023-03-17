@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -51,6 +52,7 @@ import org.theseed.utils.ParseFailureException;
  * -o	output file for report (if not STDOUT)
  *
  * --N		comma-delimited list of N-values to use for top-N comparisons (default 5,10,15,20)
+ * --focus	if specified, the base name of a report to be used as the focus for all comparisons
  *
  * @author Bruce Parrello
  *
@@ -70,6 +72,8 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
     private List<Map<String, WeightMap>> fileContents;
     /** list of all files to process */
     private List<File> reportFiles;
+    /** list index of focus file, or -1 if unfocused */
+    private int focusIdx;
     /** file filter for report files in a directory */
     private FilenameFilter BIN_REPORT_FILTER = new FilenameFilter() {
         @Override
@@ -84,6 +88,10 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
     @Option(name = "--N", metaVar = "4,8,12,16,20", usage = "comma-delimited list of N-values to use for top-N similarities")
     private String nValueString;
 
+    /** focus file for comparisons (if any) */
+    @Option(name = "--focus", metaVar = "focusReport.tbl", usage = "if specified, base name of a file to be used as the focus for all comparisons")
+    private String focusFileName;
+
     /** file names of bin reports to compare */
     @Argument(index = 0, metaVar = "file1.tbl file2.tbl ...", usage = "file name(s) of bin report(s) to compare", required = true)
     private List<File> inFiles;
@@ -91,6 +99,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
     @Override
     protected void setReporterDefaults() {
         this.nValueString = "5,10,15,20";
+        this.focusFileName = null;
     }
 
     @Override
@@ -126,6 +135,21 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         }
         if (this.reportFiles.size() < 2)
             throw new ParseFailureException("Must be at least 2 input files specified.");
+        // Check for a focus file.
+        if (this.focusFileName == null)
+            this.focusIdx = -1;
+        else {
+            OptionalInt focusFound = IntStream.range(0, this.reportFiles.size())
+                    .filter(i -> this.reportFiles.get(i).getName().contentEquals(focusFileName))
+                    .findAny();
+            if (focusFound.isEmpty())
+                throw new ParseFailureException("Focus file name not found in input file list.");
+            else {
+                this.focusIdx = focusFound.getAsInt();
+                log.info("Report will be focused on {}.", this.reportFiles.get(this.focusIdx));
+            }
+        }
+
     }
 
     @Override
@@ -152,42 +176,64 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
             if (! samples.equals(fileContent.keySet()))
                 samples.addAll(fileContent.keySet());
         }
-        // Process each sample in each pair of files.
-        for (int i1 = 0; i1 < nFiles; i1++) {
-            for (int i2 = i1 + 1; i2 < nFiles; i2++) {
-                // Get the content and name for each file.
-                var file1Map = this.fileContents.get(i1);
-                var file2Map = this.fileContents.get(i2);
-                String file1Name = this.reportFiles.get(i1).getName();
-                String file2Name = this.reportFiles.get(i2).getName();
-                // We will summarize the results in here.
-                DescriptiveStatistics[] stats = IntStream.range(0, metricN).mapToObj(i -> new DescriptiveStatistics())
-                        .toArray(DescriptiveStatistics[]::new);
-                // Loop through the samples.
-                for (String sampleId : samples) {
-                    log.info("Comparing files {} and {} for {}.", file1Name, file2Name, sampleId);
-                    // Get the weight maps for this sample.
-                    WeightMap scores1 = file1Map.get(sampleId);
-                    WeightMap scores2 = file2Map.get(sampleId);
-                    if (scores1 != null & scores2 != null) {
-                        // Ask for the metrics on these weight maps.
-                        double[] metrics = this.compareMaps(scores1, scores2);
-                        // Write out the results.
-                        writer.println(file1Name + "\t" + file2Name + "\t" + sampleId + "\t"
-                                + Arrays.stream(metrics).mapToObj(x -> Double.isNaN(x) ? "" : Double.toString(x))
-                                        .collect(Collectors.joining("\t")));
-                        // Accumulate the results.
-                        for (int i = 0; i < metricN; i++) {
-                            if (Double.isFinite(metrics[i]))
-                                stats[i].addValue(metrics[i]);
-                        }
-                    }
-                }
-                // Now write out the summary.
-                writer.println(file1Name + "\t" + file2Name + "\t" + "<average>" + "\t"
-                        + Arrays.stream(stats).map(x -> x.getN() == 0 ? "" : Double.toString(x.getMean()))
-                                .collect(Collectors.joining("\t")));
+        if (this.focusIdx < 0) {
+            // Process each sample in each pair of files.
+            for (int i1 = 0; i1 < nFiles; i1++) {
+                for (int i2 = i1 + 1; i2 < nFiles; i2++)
+                    this.processFilePair(writer, metricN, samples, i1, i2);
             }
+        } else {
+            // Process each sample against the focus file.
+            for (int i2 = 0; i2 < nFiles; i2++) {
+                if (i2 != this.focusIdx)
+                    this.processFilePair(writer, metricN, samples, this.focusIdx, i2);
+            }
+        }
+    }
+
+    /**
+     * Process a pair of bin report files.
+     *
+     * @param writer	print writer for report
+     * @param metricN	number of metrics to write
+     * @param samples	set of samples to use for comparison
+     * @param i1		index of first file
+     * @param i2		index of second file
+     */
+    private void processFilePair(PrintWriter writer, final int metricN, Set<String> samples, int i1, int i2) {
+        // Get the content and name for each file.
+        var file1Map = this.fileContents.get(i1);
+        var file2Map = this.fileContents.get(i2);
+        String file1Name = this.reportFiles.get(i1).getName();
+        String file2Name = this.reportFiles.get(i2).getName();
+        // We will summarize the results in here.
+        DescriptiveStatistics[] stats = IntStream.range(0, metricN).mapToObj(i -> new DescriptiveStatistics())
+                .toArray(DescriptiveStatistics[]::new);
+        // Loop through the samples.
+        for (String sampleId : samples) {
+            log.info("Comparing files {} and {} for {}.", file1Name, file2Name, sampleId);
+            // Get the weight maps for this sample.
+            WeightMap scores1 = file1Map.get(sampleId);
+            WeightMap scores2 = file2Map.get(sampleId);
+            if (scores1 != null & scores2 != null) {
+                // Ask for the metrics on these weight maps.
+                double[] metrics = this.compareMaps(scores1, scores2);
+                // Write out the results.
+                writer.println(file1Name + "\t" + file2Name + "\t" + sampleId + "\t"
+                        + Arrays.stream(metrics).mapToObj(x -> Double.isNaN(x) ? "" : Double.toString(x))
+                                .collect(Collectors.joining("\t")));
+                // Accumulate the results.
+                for (int i = 0; i < metricN; i++) {
+                    if (Double.isFinite(metrics[i]))
+                        stats[i].addValue(metrics[i]);
+                }
+            }
+        }
+        // If there was more than one sample, write out the summary.
+        if (samples.size() > 1) {
+            writer.println(file1Name + "\t" + file2Name + "\t" + "<average>" + "\t"
+                    + Arrays.stream(stats).map(x -> x.getN() == 0 ? "" : Double.toString(x.getMean()))
+                            .collect(Collectors.joining("\t")));
         }
     }
 

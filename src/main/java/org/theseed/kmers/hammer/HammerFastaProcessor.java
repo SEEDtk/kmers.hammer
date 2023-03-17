@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.theseed.genome.Contig;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
+import org.theseed.proteins.kmers.reps.RepGenomeDb;
 import org.theseed.sequence.FastaOutputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.BaseProcessor;
@@ -24,10 +25,10 @@ import org.theseed.utils.ParseFailureException;
 /**
  * This command reads all the genomes from a genome source and converts them into a single DNA FASTA file containing
  * the contigs.  The label of each contig will be based on the contig ID, and the comment will be
- * the genome ID itself.
+ * the genome name, the ID of the closest representative, and the distance.
  *
- * The positional parameters are the name of the genome source directory (or file, in the case of a PATRIC source), and
- * the name of the output file.
+ * The positional parameters are the name of the genome source directory (or file, in the case of a PATRIC source),
+ * the name of the representative-genome database, and the name of the output file.
  *
  * The command-line options are as follows:
  *
@@ -48,6 +49,8 @@ public class HammerFastaProcessor extends BaseProcessor {
     private GenomeSource genomes;
     /** set of contig IDs already used */
     private Set<String> contigIds;
+    /** representative-genome database */
+    private RepGenomeDb repDb;
 
     // COMMAND-LINE OPTIONS
 
@@ -59,8 +62,12 @@ public class HammerFastaProcessor extends BaseProcessor {
     @Argument(index = 0, metaVar = "inDir", usage = "input genome directory or file", required = true)
     private File inDir;
 
+    /** representative-genome database */
+    @Argument(index = 1, metaVar = "repXXX.ser", usage = "representative-genome database", required = true)
+    private File repDbFile;
+
     /** output file name */
-    @Argument(index = 1, metaVar = "outFile.fna", usage = "output FASTA file name", required = true)
+    @Argument(index = 2, metaVar = "outFile.fna", usage = "output FASTA file name", required = true)
     private File outFile;
 
     @Override
@@ -70,6 +77,12 @@ public class HammerFastaProcessor extends BaseProcessor {
 
     @Override
     protected boolean validateParms() throws IOException, ParseFailureException {
+        // Load the representative-genome database.
+        if (! this.repDbFile.canRead())
+            throw new FileNotFoundException("Repgen database file " + this.repDbFile + " is not found or unreadable.");
+        log.info("Loading repgen database from {}.", this.repDbFile);
+        this.repDb = RepGenomeDb.load(this.repDbFile);
+        // Set up the input genome source.
         if (! this.inDir.exists())
             throw new FileNotFoundException("Input genome source " + this.inDir + " not found.");
         log.info("Loading genome source from {}.", this.inDir);
@@ -99,7 +112,15 @@ public class HammerFastaProcessor extends BaseProcessor {
                         label += "_" + genomeId;
                     } else
                         this.contigIds.add(label);
-                    Sequence seq = new Sequence(label, genomeId, contig.getSequence());
+                    // Here we need to compute the comment.  To do that, we need to find the closest
+                    // representative.  In rare cases, there will be none, in which case we use an empty string.
+                    var seedProt = this.repDb.getSeedProtein(genome);
+                    var representation = this.repDb.findClosest(seedProt);
+                    String closestId = representation.getGenomeId();
+                    if (closestId == null) closestId = "";
+                    var comment = genome.getName() + "\t" + closestId + "\t" + representation.getDistance();
+                    // Form the output contig.
+                    Sequence seq = new Sequence(label, comment, contig.getSequence());
                     outStream.write(seq);
                     contigCount++;
                 }

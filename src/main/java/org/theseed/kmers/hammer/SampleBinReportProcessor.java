@@ -115,7 +115,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
 
     /** minimum number of additional hits for a region-based determination to count */
     @Option(name = "--diff", metaVar = "5", usage = "minimum number of additional hits required to qualify as a regional group classification")
-    private int minDiff;
+    private double minDiff;
 
     /** minimum acceptable quality for an input sequence */
     @Option(name = "--qual", metaVar = "30.0", usage = "minimum acceptable sequence quality (0 to 99)")
@@ -180,8 +180,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         if (this.minScore < 0.0)
             throw new ParseFailureException("Minimum score cannot be negative.");
         // Validate the minimum difference.
-        if (this.minDiff < 1)
-            throw new ParseFailureException("Minimum hit difference must be at least 1.");
+        if (this.minDiff <= 0.0)
+            throw new ParseFailureException("Minimum hit difference must be greater than 0.");
         // Insure the sample group directory exists.
         if (! this.inDir.exists())
             throw new FileNotFoundException("Input sample group " + this.inDir + " not found in file system.");
@@ -458,7 +458,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     }
 
     @Override
-    public int getMinDiff() {
+    public double getMinDiff() {
         return this.minDiff;
     }
 

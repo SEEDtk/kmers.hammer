@@ -172,4 +172,11 @@ public abstract class BaseHammerUsageProcessor extends BaseReportProcessor imple
         return this.batchSize;
     }
 
+    /**
+     * @return the count method for this hammer operation
+     */
+    public HammerDb.Method getMethod() {
+        return this.hammers.getCountMethod();
+    }
+
 }

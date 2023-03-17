@@ -37,12 +37,17 @@ public abstract class ClassStrategy {
         /**
          * @return the minimum threshold score required to be considered a dominant group for a sequence
          */
-        public int getMinDiff();
+        public double getMinDiff();
 
         /**
          * @return TRUE to scale the counts by length and coverage, else FALSE
          */
         public boolean isScaled();
+
+        /**
+         * @return the counting method
+         */
+        public HammerDb.Method getMethod();
 
     }
 

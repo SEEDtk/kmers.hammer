@@ -28,6 +28,8 @@ import org.theseed.utils.BaseProcessor;
  *  report			produce a report on a hammer database
  *  trimCheck		produce a FASTA file by comparing trimmed and untrimmed reads
  *  hammerStats		determine which hammers were found in a contig-hammer run and how many of each
+ *  debugMeta		isolate bad hits in a synthetic-sample contigTest used for abundance measures
+ *  sourMap			create a map between hammer fids and SOUR role IDs
  */
 public class App
 {
@@ -100,6 +102,12 @@ public class App
             break;
         case "hammerStats" :
             processor = new HammerStatsProcessor();
+            break;
+        case "debugMeta" :
+            processor = new DebugMetaProcessor();
+            break;
+        case "sourMap" :
+            processor = new HammerSourMapProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

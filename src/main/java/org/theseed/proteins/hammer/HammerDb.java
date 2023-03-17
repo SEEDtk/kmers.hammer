@@ -58,12 +58,12 @@ public abstract class HammerDb {
     public static enum Method {
         STRENGTH {
             @Override
-            public double getWeight(Source hitSource) {
+            public double getWeight(ISource hitSource) {
                 return hitSource.getStrength();
             }
         }, COUNT {
             @Override
-            public double getWeight(Source hitSource) {
+            public double getWeight(ISource hitSource) {
                 return 1.0;
             }
         };
@@ -73,7 +73,7 @@ public abstract class HammerDb {
          *
          * @param hitSource		hammer hit source
          */
-        public abstract double getWeight(Source hitSource);
+        public abstract double getWeight(ISource hitSource);
 
     }
 
@@ -130,7 +130,7 @@ public abstract class HammerDb {
      * This object describes a hammer's source information.  It includes the source feature ID and the
      * strength.
      */
-    public static class Source {
+    public static class Source implements ISource {
 
         /** source feature for the hammer */
         private String fid;
@@ -172,10 +172,27 @@ public abstract class HammerDb {
     }
 
     /**
+     * This interface can be used for any object that contains a hammer's feature ID and strength.
+     */
+    public interface ISource {
+
+        /**
+         * @return the hammer's feature ID
+         */
+        public String getFid();
+
+        /**
+         * @return the hammer's hit strength
+         */
+        public double getStrength();
+
+    }
+
+    /**
      * This object describes a hammer hit.  Hammer hits are sorted by hit location and then feature ID, so they
      * are organized according to the contig hit.
      */
-    public static class Hit implements Comparable<Hit> {
+    public static class Hit implements Comparable<Hit>, ISource {
 
         /** contig location hit */
         private Location loc;
@@ -593,6 +610,13 @@ public abstract class HammerDb {
      */
     public Source getSource(String hammer) throws ParseFailureException {
         throw new ParseFailureException("Get-source function not supported by this hammer database type.");
+    }
+
+    /**
+     * @return the countMethod
+     */
+    public Method getCountMethod() {
+        return this.countMethod;
     }
 
 }
