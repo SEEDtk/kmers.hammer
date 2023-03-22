@@ -20,6 +20,7 @@ import org.theseed.utils.BaseProcessor;
  *  distTest		compute the ANI distances to the expected and actual choices in a synthetic test
  *  testStats		produce statistics for each test/match genome pair in a contig test
  *  sampReport		produce a bin report for a sample group using hammers
+ *  gtoReport		count hammer hits in the genomes of a genome source
  *  pseudoBins		produce a simulated bin report from a binned sample group
  *  krakenBins		produce a simulated bin report from kraken output in a sample group
  *  synthBins		produce a simulated bin report from a synthetic contig file
@@ -108,6 +109,9 @@ public class App
             break;
         case "sourMap" :
             processor = new HammerSourMapProcessor();
+            break;
+        case "gtoReport" :
+            processor = new GtoHammerReportProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

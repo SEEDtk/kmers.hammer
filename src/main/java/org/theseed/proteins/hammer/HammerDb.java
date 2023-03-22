@@ -459,7 +459,7 @@ public abstract class HammerDb {
      *
      * @param seqs	list of sequences to scan
      *
-     * @return a count map detailing the number of hits for each genome
+     * @return a weight map detailing the hit score for each genome
      */
     public WeightMap findClosest(Collection<Sequence> seqs) {
         var retVal = new WeightMap();
