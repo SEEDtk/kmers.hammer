@@ -52,5 +52,4 @@ class TestSourMap {
         assertThat("fig|1925548.3.peg.589", testMap.getRole("fig|1925548.3.peg.589"), equalTo("ValyTrnaSynt"));
     }
 
-    // TODO constructors and methods for TestSourMap
 }

@@ -153,8 +153,8 @@ public class TrimCheckProcessor extends BaseProcessor {
             throw new ParseFailureException("Input directory does not contain both trimmed and untrimmed samples.");
         // Create the sample descriptors.
         log.info("Connecting to sample streams.");
-        this.trimmedSample = new FastqSampleDescriptor(this.inDir, trim[0], trim[1]);
-        this.untrimmedSample = new FastqSampleDescriptor(this.inDir, untrim[0], untrim[1]);
+        this.trimmedSample = new FastqSampleDescriptor(this.inDir, "trimmed", trim[0], trim[1]);
+        this.untrimmedSample = new FastqSampleDescriptor(this.inDir, "raw", untrim[0], untrim[1]);
         // Now set up the output.
         if (this.outFile == null) {
             log.info("FASTA will be produced on the standard output.");

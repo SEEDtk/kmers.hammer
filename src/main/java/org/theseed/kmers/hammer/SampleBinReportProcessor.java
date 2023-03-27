@@ -30,6 +30,7 @@ import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.fastq.FastqSampleGroup;
 import org.theseed.sequence.fastq.ReadStream;
+import org.theseed.sequence.fastq.SampleDescriptor;
 import org.theseed.sequence.fastq.SeqRead;
 import org.theseed.utils.BaseHammerUsageProcessor;
 import org.theseed.utils.ParseFailureException;
@@ -221,17 +222,15 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         writer.println("sample_id\trepgen_id\trepgen_name\tcount");
         // Start by connecting to the sample group.
         try (FastqSampleGroup sampleGroup = this.groupType.create(this.inDir)) {
-            Set<String> samples = sampleGroup.getSamples();
+            Set<String> samples = sampleGroup.getSampleIDs();
             log.info("{} samples found in {}.", samples.size(), this.inDir);
             // Now process the resume file (if any).
             if (this.resumeFile != null)
                 this.processResume(samples, writer);
             // Now we loop through the samples.
-            Stream<String> sampleStream = samples.stream();
-            if (this.paraFlag)
-                sampleStream = sampleStream.parallel();
+            Stream<SampleDescriptor> sampleStream = sampleGroup.stream(samples, this.paraFlag);
             log.info("Processing samples.");
-            sampleStream.forEach(x -> this.processSample(sampleGroup, x, writer));
+            sampleStream.forEach(x -> this.processSample(x, writer));
         }
         if (log.isInfoEnabled() && this.sampleCount > 0) {
             Duration allTime = Duration.ofMillis(this.processTime);
@@ -275,13 +274,15 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     /**
      * Scan a sample for hammers and output the genome scores.
      *
-     * @param sampleId	ID of the sample to scan
+     * @param sample	descriptor for the sample to scan
      * @param writer	output writer for the results
      */
-    private void processSample(FastqSampleGroup sampleGroup, String sampleId, PrintWriter writer) {
+    private void processSample(SampleDescriptor sample, PrintWriter writer) {
         long start = System.currentTimeMillis();
+        // Get the sample ID.
+        String sampleId = sample.getId();
         // Get the read stream.
-        ReadStream inStream = this.getStream(sampleGroup, sampleId);
+        ReadStream inStream = this.getStream(sample);
         // This timer is used to space out log messages.
         long lastMessage = 0;
         // The hammer database operates on a collection of sequences, while we have a stream of
@@ -357,13 +358,12 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     /**
      * @return a read strean for the specified sample
      *
-     * @param sampleGroup	master sample group
-     * @param sampleId		ID of the desired sample
+     * @param sample	sample to read
      */
-    private ReadStream getStream(FastqSampleGroup sampleGroup, String sampleId) {
+    private ReadStream getStream(SampleDescriptor sample) {
         ReadStream retVal;
         try {
-            retVal = sampleGroup.sampleIter(sampleId);
+            retVal = sample.reader();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
