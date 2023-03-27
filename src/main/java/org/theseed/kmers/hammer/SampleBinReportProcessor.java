@@ -17,8 +17,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -79,6 +81,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private long processTime;
     /** number of samples processed */
     private int sampleCount;
+    /** set of bad samples */
+    private Set<String> badSamples;
     /** number of sequences read */
     private int seqsIn;
     /** number of sequences rejected due to quality */
@@ -218,6 +222,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.qualReject = 0;
         this.badScores = 0;
         this.goodScores = 0;
+        this.badSamples = new TreeSet<String>();
         // Write the report header.
         writer.println("sample_id\trepgen_id\trepgen_name\tcount");
         // Start by connecting to the sample group.
@@ -239,6 +244,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             log.info("{} sequences read, {} rejected, {} batches processed.", this.seqsIn, this.qualReject, this.batchCount);
             log.info("{} sample/genome pairs output, {} rejected due to low score.", this.goodScores, this.badScores);
         }
+        if (! this.badSamples.isEmpty())
+            log.warn("The following samples had no data: {}", StringUtils.join(badSamples, ", "));
     }
 
     /**
@@ -341,10 +348,19 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             WeightMap scores = this.processBatch(batch, batchCoverage, stats);
             results.accumulate(scores);
         }
-        log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} ambiguous sequences, {} sequences classified, {} per sequence.",
-                sampleId, mySeqsIn, myBatchCount, myQualReject, results.size(), stats.ambigCount, stats.hitSeqCount, ((double) stats.hitCount) / stats.hitSeqCount);
-        // Output the genome weights.
-        this.writeSample(writer, sampleId, results);
+        boolean badSample = false;
+        if (mySeqsIn == 0) {
+            log.warn("WARNING: sample {} had no data.", sampleId);
+            badSample = true;
+        } else if (stats.hitSeqCount == 0) {
+            log.warn("WARNING: sample {} had no classifiable sequences.", sampleId);
+            badSample = true;
+        } else {
+            log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} ambiguous sequences, {} sequences classified, {} per sequence.",
+                    sampleId, mySeqsIn, myBatchCount, myQualReject, results.size(), stats.ambigCount, stats.hitSeqCount, ((double) stats.hitCount) / stats.hitSeqCount);
+            // Output the genome weights.
+            this.writeSample(writer, sampleId, results);
+        }
         // Update the counts.
         synchronized(this) {
             this.batchCount += myBatchCount;
@@ -352,6 +368,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             this.seqsIn += mySeqsIn;
             this.processTime += System.currentTimeMillis() - start;
             this.sampleCount++;
+            if (badSample)
+                this.badSamples.add(sampleId);
         }
     }
 
