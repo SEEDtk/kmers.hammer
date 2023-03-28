@@ -289,10 +289,6 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // Get the sample ID.
         String sampleId = sample.getId();
         log.info("Processing sample {}.", sampleId);
-        // Get the read stream.
-        ReadStream inStream = this.getStream(sample);
-        // This timer is used to space out log messages.
-        long lastMessage = 0;
         // The hammer database operates on a collection of sequences, while we have a stream of
         // sequence reads.  In general, the reads will be very long for FASTA samples, with varying
         // coverage, and very short for FASTQ samples, with uniform coverage.  To handle both
@@ -308,49 +304,67 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         int mySeqsIn = 0;
         int myBatchCount = 0;
         int myQualReject = 0;
+        // Denote the sample is bad.
+        boolean badSample = true;
         // Create a stats object to pass to the batch processor.
         SampleStats stats = new SampleStats();
-        // Loop through the stream.
-        while (inStream.hasNext()) {
-            SeqRead seqRead = inStream.next();
-            mySeqsIn++;
-            // Filter on quality.
-            if (seqRead.getQual() < this.minQual)
-                myQualReject++;
-            else {
-                double coverage = seqRead.getCoverage();
-                // Insure there is room in this batch for this sequence.
-                if (batchSize >= this.maxBatchDnaSize || coverage != batchCoverage) {
-                    // Here we must process the current batch.  Get the scores and
-                    // add them in.
-                    myBatchCount++;
-                    WeightMap scores = this.processBatch(batch, batchCoverage, stats);
-                    results.accumulate(scores);
-                    // Set up for the new sequence.
-                    batchCoverage = coverage;
-                    batch.clear();
-                    batchSize = 0;
-                    if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 5000) {
-                        lastMessage = System.currentTimeMillis();
-                        double rate = mySeqsIn * 1000.0 / (lastMessage - start);
-                        log.info("Sample complete: {} sequences read, {} rejected from {}, {} sequences/second.", mySeqsIn, myQualReject, sampleId, rate);
+        // Get the read stream.
+        try (ReadStream inStream = this.getStream(sample)) {
+            // This timer is used to space out log messages.
+            long lastMessage = 0;
+            // Loop through the stream.
+            while (inStream.hasNext()) {
+                SeqRead seqRead = inStream.next();
+                mySeqsIn++;
+                // Filter on quality.
+                if (seqRead.getQual() < this.minQual)
+                    myQualReject++;
+                else {
+                    double coverage = seqRead.getCoverage();
+                    // Insure there is room in this batch for this sequence.
+                    if (batchSize >= this.maxBatchDnaSize || coverage != batchCoverage) {
+                        // Here we must process the current batch.  Get the scores and
+                        // add them in.
+                        myBatchCount++;
+                        WeightMap scores = this.processBatch(batch, batchCoverage, stats);
+                        results.accumulate(scores);
+                        // Set up for the new sequence.
+                        batchCoverage = coverage;
+                        batch.clear();
+                        batchSize = 0;
+                        if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 5000) {
+                            lastMessage = System.currentTimeMillis();
+                            double rate = mySeqsIn * 1000.0 / (lastMessage - start);
+                            log.info("Sample complete: {} sequences read, {} rejected from {}, {} sequences/second.", mySeqsIn, myQualReject, sampleId, rate);
+                        }
                     }
+                    // Convert the read to a sequence and add it to the batch.
+                    final String seqId = seqRead.getLabel();
+                    Sequence seq = new Sequence(seqId, "", seqRead.getSequence());
+                    batch.put(seqId, seq);
+                    batchSize += seq.length();
                 }
-                // Convert the read to a sequence and add it to the batch.
-                final String seqId = seqRead.getLabel();
-                Sequence seq = new Sequence(seqId, "", seqRead.getSequence());
-                batch.put(seqId, seq);
-                batchSize += seq.length();
             }
+            // Process the residual batch.
+            if (batch.size() > 0) {
+                myBatchCount++;
+                WeightMap scores = this.processBatch(batch, batchCoverage, stats);
+                results.accumulate(scores);
+            }
+            // No errors, so the sample is good.
+            badSample = true;
+        } catch (UncheckedIOException e) {
+            IOException cause = e.getCause();
+            String message;
+            if (cause != null)
+                message = cause.toString();
+            else
+                message = e.getMessage();
+            log.error("ERROR processing sample {}: {}", sampleId, message);
         }
-        // Process the residual batch.
-        if (batch.size() > 0) {
-            myBatchCount++;
-            WeightMap scores = this.processBatch(batch, batchCoverage, stats);
-            results.accumulate(scores);
-        }
-        boolean badSample = false;
-        if (mySeqsIn == 0) {
+        if (badSample)
+            log.error("Sample {} suppressed due to error.", sampleId);
+        else if (mySeqsIn == 0) {
             log.warn("WARNING: sample {} had no data.", sampleId);
             badSample = true;
         } else if (stats.hitSeqCount == 0) {
