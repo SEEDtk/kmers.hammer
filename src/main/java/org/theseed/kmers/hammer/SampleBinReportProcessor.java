@@ -288,6 +288,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         long start = System.currentTimeMillis();
         // Get the sample ID.
         String sampleId = sample.getId();
+        log.info("Processing sample {}.", sampleId);
         // Get the read stream.
         ReadStream inStream = this.getStream(sample);
         // This timer is used to space out log messages.
@@ -332,7 +333,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                     if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 5000) {
                         lastMessage = System.currentTimeMillis();
                         double rate = mySeqsIn * 1000.0 / (lastMessage - start);
-                        log.info("{} sequences read, {} rejected from {}, {} sequences/second.", mySeqsIn, myQualReject, sampleId, rate);
+                        log.info("Sample complete: {} sequences read, {} rejected from {}, {} sequences/second.", mySeqsIn, myQualReject, sampleId, rate);
                     }
                 }
                 // Convert the read to a sequence and add it to the batch.
