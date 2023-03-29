@@ -332,10 +332,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                         batchCoverage = coverage;
                         batch.clear();
                         batchSize = 0;
-                        if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 5000) {
+                        if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 10000) {
                             lastMessage = System.currentTimeMillis();
                             double rate = mySeqsIn * 1000.0 / (lastMessage - start);
-                            log.info("Sample complete: {} sequences read, {} rejected from {}, {} sequences/second.", mySeqsIn, myQualReject, sampleId, rate);
+                            log.info("{} sequences read, {} rejected from {}, {} sequences/second.", mySeqsIn, myQualReject, sampleId, rate);
                         }
                     }
                     // Convert the read to a sequence and add it to the batch.
@@ -352,7 +352,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 results.accumulate(scores);
             }
             // No errors, so the sample is good.
-            badSample = true;
+            badSample = false;
         } catch (UncheckedIOException e) {
             IOException cause = e.getCause();
             String message;
@@ -371,7 +371,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             log.warn("WARNING: sample {} had no classifiable sequences.", sampleId);
             badSample = true;
         } else {
-            log.info("Sample {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} ambiguous sequences, {} sequences classified, {} per sequence.",
+            log.info("Sample complete: {} contained {} sequences in {} batches.  {} were rejected due to quality.  {} genomes scored.  {} ambiguous sequences, {} sequences classified, {} per sequence.",
                     sampleId, mySeqsIn, myBatchCount, myQualReject, results.size(), stats.ambigCount, stats.hitSeqCount, ((double) stats.hitCount) / stats.hitSeqCount);
             // Output the genome weights.
             this.writeSample(writer, sampleId, results);
