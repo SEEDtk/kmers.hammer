@@ -84,15 +84,15 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     /** set of bad samples */
     private Set<String> badSamples;
     /** number of sequences read */
-    private int seqsIn;
+    private long seqsIn;
     /** number of sequences rejected due to quality */
-    private int qualReject;
+    private long qualReject;
     /** number of batches processed */
-    private int batchCount;
+    private long batchCount;
     /** number of genomes rejected due to low score */
-    private int badScores;
+    private long badScores;
     /** number of genomes output for all samples */
-    private int goodScores;
+    private long goodScores;
     /** maximum batch size in base pairs */
     private int maxBatchDnaSize;
     /** classification strategy helper */
