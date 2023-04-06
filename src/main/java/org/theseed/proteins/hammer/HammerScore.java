@@ -14,7 +14,9 @@ import java.util.Set;
  * @author Bruce Parrello
  *
  */
-public class HammerScore {
+public abstract class HammerScore {
+
+
 
     // FIELDS
     /** source feature ID */
@@ -22,17 +24,94 @@ public class HammerScore {
     /** role for this hammer */
     private String roleId;
     /** neighbor set for this hammer's source genome (including the source itself) */
-    private Set<String> neighborhood;
+    protected Set<String> neighborhood;
     /** number of neighborhood hits */
-    private int goodHits;
+    protected int goodHits;
     /** number of foreign hits */
-    private int badHits;
+    protected int badHits;
     /** TRUE if the hammer is invalid (found in multiple repgens), else FALSE */
     private boolean badHammer;
     /** mean neighborhood size */
     private static double NORMAL_NEIGHBORHOOD = 42.0;
     /** total number of genomes in the system */
-    private static int totalGenomes;
+    protected static int totalGenomes;
+
+    /**
+     * This enum handles the different types of scoring objects.  Each uses a different method for computing
+     * the strength of a hammer (which is our measure of confidence.
+     *
+     * @author Bruce Parrello
+     *
+     */
+    public enum Type {
+
+        /** strength is related to worthiness; a hammer that occurs in more neighbors is stronger */
+        WORTH_BASED {
+            @Override
+            public HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag) {
+                return new HammerScore.Worth(fid, role, neighborSet, badFlag);
+            }
+        },
+
+        /** strength is related to neighbor size; a hammer for a more-common genome is stronger */
+        POP_BASED {
+            @Override
+            public HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag) {
+                return new HammerScore.Pop(fid, role, neighborSet, badFlag);
+            }
+        };
+
+        /**
+         * This creates a scoring object for a hammer.
+         *
+         * @param fid			source feature for the hammer
+         * @param role			ID of the role for the hammer
+         * @param neighborSet	ID set for the source genome's neighborhood
+         * @param badFlag		initial value for the bad-hammer flag
+         *
+         * @return a hammer-scoring object of this type
+         */
+        public abstract HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag);
+
+    }
+
+    /**
+     * This hammer type has more confidence if the genome type is more common.
+     */
+    public static class Pop extends HammerScore {
+
+        public Pop(String fid, String role, Set<String> neighborSet, boolean badFlag) {
+            super(fid, role, neighborSet, badFlag);
+        }
+
+        @Override
+        public double getStrength() {
+            double retVal = this.neighborhood.size() / NORMAL_NEIGHBORHOOD;
+            if (retVal > 1.0) retVal = 1.0;
+            return retVal;
+        }
+
+    }
+
+    /**
+     * This hammer type has more confidence if the hammer itself is more common.
+     */
+    public static class Worth extends HammerScore {
+
+        public Worth(String fid, String role, Set<String> neighborSet, boolean badFlag) {
+            super(fid, role, neighborSet, badFlag);
+        }
+
+        @Override
+        public double getStrength() {
+            double retVal = 1.0 / NORMAL_NEIGHBORHOOD;
+            if (this.goodHits > 1)
+                retVal += (this.goodHits - 1);
+            return retVal / this.neighborhood.size();
+        }
+
+    }
+
 
     /**
      * Construct a new hammer scoring object.
@@ -105,12 +184,7 @@ public class HammerScore {
      *
      * @return the strength of the hammer
      */
-    public double getStrength() {
-        double retVal = 1.0 / NORMAL_NEIGHBORHOOD;
-        if (this.goodHits > 1)
-            retVal += (this.goodHits - 1);
-        return retVal / this.neighborhood.size();
-    }
+    public abstract double getStrength();
 
     /**
      * @return the hammer's source feature ID

@@ -62,6 +62,7 @@ import org.theseed.utils.ParseFailureException;
  * --maxRepeat	maximum percent of a hammer that can belong to a single base pair type (default 0.70)
  * --para		if specified, parallel processing will be used, which increases memory size but improves performance
  * --clean		if specified, the name of a genome source for the representative genomes, to be used to clean the hammer set
+ * --sType		type of strength computation to use (default POP_BASED)
  *
  * @author Bruce Parrello
  *
@@ -126,6 +127,10 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     @Option(name = "--type", aliases = { "-t" }, usage = "type of genome source for optional cleaning genomes")
     private GenomeSource.Type sourceType;
 
+    /** type of strength computation to use */
+    @Option(name = "--sType", usage = "type of strength computation to use")
+    private HammerScore.Type strengthType;
+
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
     private File finderDir;
@@ -141,6 +146,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         this.paraFlag = false;
         this.repDir = null;
         this.sourceType = GenomeSource.Type.DIR;
+        this.strengthType = HammerScore.Type.POP_BASED;
     }
 
     @Override
@@ -332,7 +338,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                         // as bad.  Otherwise, add it to the map.  Map updates are thread-safe, and even if we bad-flag
                         // the score, it is the only operation allowed on that flag, so thread safety does not matter.
                         boolean newHammer = this.hammerMap.update(kmer, x -> x.setBadHammer(),
-                                x -> new HammerScore(fid, roleId, neighbors, alwaysBad));
+                                x -> this.strengthType.create(fid, roleId, neighbors, alwaysBad));
                         if (!newHammer)
                             commonCount++;
                     }
