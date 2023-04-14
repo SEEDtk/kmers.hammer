@@ -148,7 +148,7 @@ public abstract class HammerScore {
      */
     public synchronized void recordHit(String genomeId, String role) {
         if (! this.roleId.contentEquals(role))
-            this.badHammer = false;
+            this.badHammer = true;
         else if (this.neighborhood.contains(genomeId))
             this.goodHits++;
         else

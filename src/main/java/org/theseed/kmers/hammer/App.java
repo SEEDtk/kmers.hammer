@@ -31,6 +31,7 @@ import org.theseed.utils.BaseProcessor;
  *  hammerStats		determine which hammers were found in a contig-hammer run and how many of each
  *  debugMeta		isolate bad hits in a synthetic-sample contigTest used for abundance measures
  *  sourMap			create a map between hammer fids and SOUR role IDs
+ *  hCompare		compare two hammer databases
  */
 public class App
 {
@@ -113,6 +114,9 @@ public class App
         case "gtoReport" :
             processor = new GtoHammerReportProcessor();
             break;
+        case "hCompare" :
+        	processor = new HammerCompareReportProcessor();
+        	break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");
         }

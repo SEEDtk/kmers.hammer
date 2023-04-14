@@ -63,6 +63,7 @@ import org.theseed.utils.ParseFailureException;
  * --para		if specified, parallel processing will be used, which increases memory size but improves performance
  * --clean		if specified, the name of a genome source for the representative genomes, to be used to clean the hammer set
  * --sType		type of strength computation to use (default POP_BASED)
+ * --reject		if specified, a file to contain the hammers rejected due to conflicts
  *
  * @author Bruce Parrello
  *
@@ -131,6 +132,10 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     @Option(name = "--sType", usage = "type of strength computation to use")
     private HammerScore.Type strengthType;
 
+    /** optional rejected-hammer file */
+    @Option(name = "--reject", usage = "optional output file for rejected hammers")
+    private File rejectFile;
+
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
     private File finderDir;
@@ -147,6 +152,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         this.repDir = null;
         this.sourceType = GenomeSource.Type.DIR;
         this.strengthType = HammerScore.Type.POP_BASED;
+        this.rejectFile = null;
     }
 
     @Override
@@ -247,7 +253,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         File fastaFile = fastaEntry.getValue();
         log.info("Processing hammers for role {} using {}.", roleId, fastaFile);
         // Read all the sequences from the FASTA file into the sequence map.  We need to convert the IO
-        // exception so we can use this method in a stream.
+        // exception to unchecked so we can use this method in a stream.
         Map<String, Map<String, String>> sequenceMap;
         try {
             sequenceMap = this.readSequences(fastaFile, roleId);
@@ -334,9 +340,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                     if (bestBaseCount > this.maxRepeatCount)
                         badCount++;
                     else {
-                        // Here the hamemr is valid.  Check it against the map.  If it already exists, remember it
-                        // as bad.  Otherwise, add it to the map.  Map updates are thread-safe, and even if we bad-flag
-                        // the score, it is the only operation allowed on that flag, so thread safety does not matter.
+                        // Here the hammer is valid.  Check it against the map.  If it already exists, remember it
+                        // as bad.  Otherwise, add it to the map.  The update operation is thread-safe.
                         boolean newHammer = this.hammerMap.update(kmer, x -> x.setBadHammer(),
                                 x -> this.strengthType.create(fid, roleId, neighbors, alwaysBad));
                         if (!newHammer)
@@ -395,7 +400,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      *
      * @param repId		ID of the representative genome to scan
      *
-     * @return the number of hammers marked bad
+     * @return the number of hammers removed
      */
     private int cleanHammers(String repId) {
         Genome repGenome = this.repGenomes.getGenome(repId);
@@ -410,11 +415,10 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 HammerScore score = this.hammerMap.get(kmer);
                 if (score != null) {
                     // Here we have a hammer.  If it is invalid, remove it.
-                    if (score.isBadHammer() || ! repId.contentEquals(Feature.genomeOf(score.getFid()))) {
+                    if (! repId.contentEquals(Feature.genomeOf(score.getFid()))) {
                         HammerScore testScore = this.hammerMap.remove(kmer);
-                        // If the hammer was bad, we don't count it here.  If the remove returned NULL,
-                        // someone else got to this hammer first.
-                        if (! score.isBadHammer() && testScore != null)
+                        // If the remove returned NULL, someone else got to this hammer first.
+                        if (testScore != null)
                             retVal++;
                     }
                 }
@@ -441,41 +445,80 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      * Write the hammers to the output.  This method happens only once, so unlike the rest, it is not thread-safe.
      *
      * @param writer	output file for the hammer list
+     *
+     * @throws IOException
      */
-    private void writeHammers(PrintWriter writer) {
+    private void writeHammers(PrintWriter writer) throws IOException {
         log.info("Writing output (this will take many minutes).");
         long hammersIn = 0;
         long lowPrec = 0;
         long lowWorth = 0;
         long hammersOut = 0;
-        // Write the output header.
-        writer.println("hammer\tfid\tstrength\tprecision\tworth\thits\trole");
-        // Loop through the hammers in the hammer map.
-        for (var hammerEntry : this.hammerMap) {
-            String hammer = hammerEntry.getKey();
-            HammerScore score = hammerEntry.getValue();
-            // Only proceed if the hammer is good.
-            if (! score.isBadHammer()) {
-                double worth = score.getWorthiness();
-                double precision = score.getPrecision();
-                String fid = score.getFid();
+        long badHammer = 0;
+        // Set up the reject-file stream here.
+        PrintWriter rWriter = null;
+        try {
+            if (this.rejectFile != null) {
+                rWriter = new PrintWriter(this.rejectFile);
+                log.info("Writing reject list to {}.", this.rejectFile);
+                this.writeHammerHeader(rWriter);
+            }
+            // Write the output header.
+            this.writeHammerHeader(writer);
+            // Loop through the hammers in the hammer map.
+            for (var hammerEntry : this.hammerMap) {
+                String hammer = hammerEntry.getKey();
+                HammerScore score = hammerEntry.getValue();
+                // Only proceed if the hammer is good.
                 hammersIn++;
-                // Filter out the hammers that aren't useful.
-                if (worth < this.minWorth)
-                    lowWorth++;
-                else if (precision < this.minPrec)
-                    lowPrec++;
-                else {
-                    // Here we have a good hammer.
-                    writer.println(hammer + "\t" + fid + "\t" + score.getStrength() + "\t"
-                            + precision + "\t" + worth + "\t" + score.getGoodHits() + "\t"
-                            + score.getRoleId());
-                    hammersOut++;
+                if (score.isBadHammer()) {
+                    badHammer++;
+                    if (rWriter != null)
+                        this.writeHammer(rWriter, hammer, score);
+                } else {
+                    double worth = score.getWorthiness();
+                    double precision = score.getPrecision();
+                    // Filter out the hammers that aren't useful.
+                    if (worth < this.minWorth)
+                        lowWorth++;
+                    else if (precision < this.minPrec)
+                        lowPrec++;
+                    else {
+                        // Here we have a good hammer.
+                        this.writeHammer(writer, hammer, score);
+                        hammersOut++;
+                    }
                 }
             }
+            log.info("{} hammers checked, {} marked bad, {} rejected due to low precision, {} due to low worth, {} output.",
+                    hammersIn, badHammer, lowPrec, lowWorth, hammersOut);
+        } finally {
+            // Insure the reject file is closed.
+            if (rWriter != null)
+                rWriter.close();
         }
-        log.info("{} hammers checked, {} rejected due to low precision, {} due to low worth, {} output.",
-                hammersIn, lowPrec, lowWorth, hammersOut);
+    }
+
+    /**
+     * Write a hammer to an output file.
+     *
+     * @param writer	output print writer
+     * @param hammer	hammer to write
+     * @param score		associated scoring object
+     */
+    private void writeHammer(PrintWriter writer, String hammer, HammerScore score) {
+        writer.println(hammer + "\t" + score.getFid() + "\t" + score.getStrength() + "\t"
+                + score.getPrecision() + "\t" + score.getWorthiness() + "\t"
+                + score.getGoodHits() + "\t" + score.getRoleId());
+    }
+
+    /**
+     * Write the output header for a hammer list.
+     *
+     * @param writer	output writer for the list
+     */
+    private void writeHammerHeader(PrintWriter writer) {
+        writer.println("hammer\tfid\tstrength\tprecision\tworth\thits\trole");
     }
 
 
