@@ -216,15 +216,21 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         // Create the master hammer map.
         this.hammerMap = new HammerMap<HammerScore>(this.kmerSize);
         // Now we are ready to begin.  For each role, we load all the sequences into memory, grouped
-        // by representative genome.
+        // by representative genome, and put the good ones in the hammer map.
         var fastaFileMap = this.finder.getFastas();
         var fastaStream = fastaFileMap.entrySet().stream();
         if (this.paraFlag)
             fastaStream = fastaStream.parallel();
-        fastaStream.forEach(x -> this.processRole(x));
+        fastaStream.forEach(x -> this.findRoleHammers(x));
         log.info("{} hammers scanned in {} representative genomes.  {} rejected due to low complexity, {} due to conflicts, {} kept.",
                 this.repScanCount, this.neighborMap.size(), this.rejectCount, this.conflictCount, this.hammerMap.size());
-        log.info("{} total kmers scanned in neighbor genomes.", this.kmerCount);
+        // Now we run through it all again, scoring the hammers found.  We have to do this in separate runs to avoid a race
+        // condition between finding and counting relating to bad hammers.
+        fastaStream = fastaFileMap.entrySet().stream();
+        if (this.paraFlag)
+            fastaStream = fastaStream.parallel();
+        fastaStream.forEach(x -> this.countRoleHammers(x));
+        log.info("{} total kmers scanned in neighbor genomes. Conflict count is now {}.", this.kmerCount, this.conflictCount);
         log.info("Hammer map has a load factor of {} and overload factor of {}.", this.hammerMap.loadFactor(),
                 this.hammerMap.overloadFactor());
         if (this.repGenomes != null) {
@@ -243,29 +249,35 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     }
 
     /**
-     * Process the hammers for a single role.
+     * Find the hammers for a single role.
      *
      * @param fastaEntry	map entry containing the role ID and the role's finder FASTA file
      *
      */
-    private void processRole(Entry<String, File> fastaEntry) {
+    private void findRoleHammers(Entry<String, File> fastaEntry) {
         String roleId = fastaEntry.getKey();
         File fastaFile = fastaEntry.getValue();
-        log.info("Processing hammers for role {} using {}.", roleId, fastaFile);
-        // Read all the sequences from the FASTA file into the sequence map.  We need to convert the IO
-        // exception to unchecked so we can use this method in a stream.
-        Map<String, Map<String, String>> sequenceMap;
-        try {
-            sequenceMap = this.readSequences(fastaFile, roleId);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        // Read all the sequences from the FASTA file into the sequence map.
+        Map<String, Map<String, String>> sequenceMap = this.readSequences(fastaFile, roleId);
         // Now we have all the DNA sequences for this role in the sequence map, organized by genome ID.
         // We run through all the repgens, storing the hammers in the map.  Then we run through all
         // the others, counting the hits.  First, the repgens.
         log.info("Scanning hammers for role {} in representative genomes.", roleId);
         this.findHammers(roleId, sequenceMap);
-        // Now, the other genomes.
+    }
+
+    /**
+     * Score the hammers for a single role.
+     *
+     * @param fastaEntry	map entry containing the role ID and the role's finder FASTA file
+     *
+     */
+    private void countRoleHammers(Entry<String, File> fastaEntry) {
+        String roleId = fastaEntry.getKey();
+        File fastaFile = fastaEntry.getValue();
+        // Read all the sequences from the FASTA file into the sequence map.
+        Map<String, Map<String, String>> sequenceMap = this.readSequences(fastaFile, roleId);
+        // Count the hammers in the non-representative genomes to score them.
         log.info("Counting hammer occurrences for role {} in non-representative genomes.", roleId);
         this.countHammers(roleId, sequenceMap);
     }
@@ -277,11 +289,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
      * @param roleId		ID of the current role
      *
      * @return a map of feature IDs to sequences for each genome
-     *
-     * @throws IOException
      */
-    private Map<String, Map<String, String>> readSequences(File fastaFile, String roleId) throws IOException {
-        long lastMsg = System.currentTimeMillis();
+    private Map<String, Map<String, String>> readSequences(File fastaFile, String roleId) {
         // Create the return map.  There will be one entry per genome in the system.
         var retVal = new HashMap<String, Map<String, String>>(this.genomeCount * 4 / 3 + 1);
         // Loop through the FASTA file.
@@ -296,11 +305,11 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                 Map<String,String> gMap = retVal.computeIfAbsent(genomeId, x -> new TreeMap<String, String>());
                 gMap.put(fid, seq.getSequence());
                 inCount++;
-                if (log.isInfoEnabled() && System.currentTimeMillis() - lastMsg >= 5000) {
-                    log.info("{} sequences for role {} read for {} genomes.", inCount, roleId, retVal.size());
-                    lastMsg = System.currentTimeMillis();
-                }
             }
+            log.info("{} sequences read for role {}.", inCount, roleId);
+        } catch (IOException e) {
+            // Convert the exception to unchecked so we can use this in a stream.
+            throw new UncheckedIOException(e);
         }
         return retVal;
     }
@@ -381,8 +390,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
                     if (score != null)
                         score.recordHit(genomeId, roleId);
                 }
-                if (log.isInfoEnabled() && System.currentTimeMillis() - lastMsg >= 5000) {
-                    log.info("{} kmers scanned for role {}.", kCount, roleId);
+                if (log.isInfoEnabled() && System.currentTimeMillis() - lastMsg >= 10000) {
+                    log.info("{} kmers counted for role {}.", kCount, roleId);
                     lastMsg = System.currentTimeMillis();
                 }
             }
