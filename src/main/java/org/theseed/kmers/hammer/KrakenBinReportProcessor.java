@@ -52,6 +52,14 @@ public class KrakenBinReportProcessor extends BaseReportProcessor {
     private Map<Integer, WeightMap> genusMaps;
     /** map from species ID -> repgen weight map */
     private Map<Integer, WeightMap> speciesMaps;
+    /** number of species found */
+    private int speciesCount;
+    /** number of species missing */
+    private int speciesNotFound;
+    /** number of genera found */
+    private int genusCount;
+    /** number of genera missing */
+    private int genusNotFound;
     /** file filter for sample directories */
     private FileFilter SAMPLE_DIR_FILTER = new FileFilter() {
         @Override
@@ -120,39 +128,28 @@ public class KrakenBinReportProcessor extends BaseReportProcessor {
             WeightMap weights = new WeightMap(hashSize);
             // Loop through the Kraken output file.  This is a tab-delimited file with no headers.
             final File krakenFile = new File(sampleDir, "kraken.tbl");
-            try (TabbedLineReader kStream = new TabbedLineReader(krakenFile, 5)) {
-                int lineCount = 0;
-                int genusCount = 0;
-                int genusNotFound = 0;
-                int speciesCount = 0;
-                int speciesNotFound = 0;
-                for (var line : kStream) {
-                    int taxId = line.getInt(4);
+            try (TabbedLineReader kStream = new TabbedLineReader(krakenFile, 8)) {
+                this.genusCount = 0;
+                this.genusNotFound = 0;
+                this.speciesCount = 0;
+                this.speciesNotFound = 0;
+                // If we have minimizer data, we set this to 2, to adjust the input column indices.
+                int offset = 0;
+                // Get the first line to check it.
+                if (! kStream.hasNext())
+                    throw new IOException("No data in input file.");
+                var line = kStream.next();
+                int lineCount = 1;
+                //  If there is data in the seventh column, there is minimizer data.
+                if (! line.isEmpty(6))
+                    offset = 2;
+                // Tally the first line.
+                this.processLine(weights, offset, line);
+                // Tally the other lines.
+                while (kStream.hasNext()) {
+                    line = kStream.next();
                     lineCount++;
-                    // Get the rank for this taxonomic grouping.
-                    String rankCode = line.get(3);
-                    switch (rankCode) {
-                    case "G" :
-                        // For a genus, we count only the taxon-specific fragments.
-                        WeightMap gWeights = this.genusMaps.get(taxId);
-                        if (gWeights == null)
-                            genusNotFound++;
-                        else {
-                            weights.accumulate(gWeights, line.getInt(2));
-                            genusCount++;
-                        }
-                        break;
-                    case "S" :
-                        // For a species, we cound the whole clade, since we don't go any lower.
-                        WeightMap sWeights = this.speciesMaps.get(taxId);
-                        if (sWeights == null)
-                            speciesNotFound++;
-                        else {
-                            weights.accumulate(sWeights, line.getInt(1));
-                            speciesCount++;
-                        }
-                        break;
-                    }
+                    this.processLine(weights, offset, line);
                 }
                 log.info("{} lines read, {} species not found, {} genera not found, {} species counted, {} genera counted, {} representatives.",
                         lineCount, speciesNotFound, genusNotFound, speciesCount, genusCount, weights.size());
@@ -167,6 +164,41 @@ public class KrakenBinReportProcessor extends BaseReportProcessor {
             }
         }
 
+    }
+
+    /**
+     * Process the data from a single input line.
+     *
+     * @param weights	weight map
+     * @param offset	offset code used to determine input format
+     * @param line		input line
+     */
+    private void processLine(WeightMap weights, int offset, TabbedLineReader.Line line) {
+        // Get the rank for this taxonomic grouping.
+        int taxId = line.getInt(4 + offset);
+        String rankCode = line.get(3 + offset);
+        switch (rankCode) {
+        case "G" :
+            // For a genus, we count only the taxon-specific fragments.
+            WeightMap gWeights = this.genusMaps.get(taxId);
+            if (gWeights == null)
+                this.genusNotFound++;
+            else {
+                weights.accumulate(gWeights, line.getInt(2));
+                this.genusCount++;
+            }
+            break;
+        case "S" :
+            // For a species, we cound the whole clade, since we don't go any lower.
+            WeightMap sWeights = this.speciesMaps.get(taxId);
+            if (sWeights == null)
+                this.speciesNotFound++;
+            else {
+                weights.accumulate(sWeights, line.getInt(1));
+                this.speciesCount++;
+            }
+            break;
+        }
     }
 
     /**
