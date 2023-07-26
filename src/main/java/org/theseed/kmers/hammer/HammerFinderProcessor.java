@@ -31,6 +31,8 @@ import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.seeds.ProteinFinder;
+import org.theseed.sequence.seeds.filters.HammerDupFilter;
+import org.theseed.sequence.seeds.filters.HammerFeatureFilter;
 import org.theseed.utils.BasePipeProcessor;
 import org.theseed.utils.ParseFailureException;
 
@@ -64,11 +66,13 @@ import org.theseed.utils.ParseFailureException;
  * --clean		if specified, the name of a genome source for the representative genomes, to be used to clean the hammer set
  * --sType		type of strength computation to use (default POP_BASED)
  * --reject		if specified, a file to contain the hammers rejected due to conflicts
+ * --pegFilter	filter for features to use in the finder (default ALL)
+ * --dupFilter	algorithm to use for processing multi-occurring roles in a genome (default KEEP)
  *
  * @author Bruce Parrello
  *
  */
-public class HammerFinderProcessor extends BasePipeProcessor {
+public class HammerFinderProcessor extends BasePipeProcessor implements HammerFeatureFilter.IParms, HammerDupFilter.IParms {
 
     // FIELDS
     /** logging facility */
@@ -93,6 +97,10 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     private HammerMap<HammerScore> hammerMap;
     /** genome source for representative genomes, or NULL if there is no cleaning step */
     private GenomeSource repGenomes;
+    /** feature filter to use */
+    private HammerFeatureFilter pegFilter;
+    /** duplicate-role filter to use */
+    private HammerDupFilter dupFilter;
 
     // COMMAND-LINE OPTIONS
 
@@ -136,6 +144,14 @@ public class HammerFinderProcessor extends BasePipeProcessor {
     @Option(name = "--reject", usage = "optional output file for rejected hammers")
     private File rejectFile;
 
+    /** hammer-feature filter used to select features for hammer analysis */
+    @Option(name = "--pegFilter", usage = "filter for finder features to use for hammer generation")
+    private HammerFeatureFilter.Type pegFilterType;
+
+    /** hammer-feature filter used to handle duplicate features for a role */
+    @Option(name = "--dupFilter", usage = "filter for duplicate features to select for hammer generation")
+    private HammerDupFilter.Type dupFilterType;
+
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
     private File finderDir;
@@ -153,6 +169,8 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         this.sourceType = GenomeSource.Type.DIR;
         this.strengthType = HammerScore.Type.POP_BASED;
         this.rejectFile = null;
+        this.pegFilterType = HammerFeatureFilter.Type.ALL;
+        this.dupFilterType = HammerDupFilter.Type.KEEP;
     }
 
     @Override
@@ -177,6 +195,9 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             log.info("Hammers will be cleaned using representative genomes in {}.", this.repDir);
             this.repGenomes = this.sourceType.create(this.repDir);
         }
+        // Initialize the hammer-feature filters.
+        this.pegFilter = this.pegFilterType.create(this);
+        this.dupFilter = this.dupFilterType.create(this);
         // Finally, set up the protein finder.
         log.info("Loading protein-finder from {}.", this.finderDir);
         this.finder = new ProteinFinder(this.finderDir);
@@ -297,16 +318,23 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         log.info("Reading sequences from {} for role {}.", fastaFile, roleId);
         try (var inStream = new FastaInputStream(fastaFile)) {
             int inCount = 0;
+            int filterCount = 0;
             for (Sequence seq : inStream) {
-                // Get the genome ID for this sequence.
-                String fid = seq.getLabel();
-                String genomeId = Feature.genomeOf(fid);
-                // Get the genome's sequence map.
-                Map<String,String> gMap = retVal.computeIfAbsent(genomeId, x -> new TreeMap<String, String>());
-                gMap.put(fid, seq.getSequence());
+                // Apply the feature filter.
+                boolean keep = this.pegFilter.check(seq);
+                if (! keep)
+                    filterCount++;
+                else {
+                    // Get the genome ID for this sequence.
+                    String fid = seq.getLabel();
+                    String genomeId = Feature.genomeOf(fid);
+                    // Get the genome's sequence map.
+                    Map<String,String> gMap = retVal.computeIfAbsent(genomeId, x -> new TreeMap<String, String>());
+                    gMap.put(fid, seq.getSequence());
+                }
                 inCount++;
             }
-            log.info("{} sequences read for role {}.", inCount, roleId);
+            log.info("{} sequences read for role {}. {} removed by filter.", inCount, roleId, filterCount);
         } catch (IOException e) {
             // Convert the exception to unchecked so we can use this in a stream.
             throw new UncheckedIOException(e);
@@ -327,6 +355,7 @@ public class HammerFinderProcessor extends BasePipeProcessor {
         long scanCount = 0;
         long badCount = 0;
         long commonCount = 0;
+        long skipCount = 0;
         // Loop through the repgen genomes.  We need the genome ID and the neighbor set for each.
         for (var repEntry : this.neighborMap.entrySet()) {
             String repId = repEntry.getKey();
@@ -337,29 +366,36 @@ public class HammerFinderProcessor extends BasePipeProcessor {
             var fidMap = sequenceMap.get(repId);
             if (fidMap != null) {
                 // Yes, it does. In almost every case, there will be a single feature in the finder for this genome.
-                // If there is more than one, we default to the first.
-                var fid = fidMap.keySet().iterator().next();
-                // Get all the kmers for this protein's sequences.
-                Set<String> kmers = this.getHammers(fidMap.values());
-                // For each kmer, if it is new, we add it as a hammer.  If it is old, we mark it as invalid.
-                // We must, however, check for low-complexity sequences.
-                for (String kmer : kmers) {
-                    scanCount++;
-                    int bestBaseCount = HammerMap.commonBaseCount(kmer);
-                    if (bestBaseCount > this.maxRepeatCount)
-                        badCount++;
-                    else {
-                        // Here the hammer is valid.  Check it against the map.  If it already exists, remember it
-                        // as bad.  Otherwise, add it to the map.  The update operation is thread-safe.
-                        boolean newHammer = this.hammerMap.update(kmer, x -> x.setBadHammer(),
-                                x -> this.strengthType.create(fid, roleId, neighbors, alwaysBad));
-                        if (!newHammer)
-                            commonCount++;
+                // If there is more than one, we only generate hammers for the ones chosen by the dup-filter.
+                Map<String, String> filtered = this.dupFilter.filter(fidMap);
+                // Count the filtered features.
+                int newCount = filtered.size();
+                skipCount += fidMap.size() - newCount;
+                // Only proceed if any are left.
+                if (newCount > 0) {
+                    var fid = fidMap.keySet().iterator().next();
+                    // Get all the kmers for this protein's sequences.
+                    Set<String> kmers = this.getHammers(filtered.values());
+                    // For each kmer, if it is new, we add it as a hammer.  If it is old, we mark it as invalid.
+                    // We must, however, check for low-complexity sequences.
+                    for (String kmer : kmers) {
+                        scanCount++;
+                        int bestBaseCount = HammerMap.commonBaseCount(kmer);
+                        if (bestBaseCount > this.maxRepeatCount)
+                            badCount++;
+                        else {
+                            // Here the hammer is valid.  Check it against the map.  If it already exists, remember it
+                            // as bad.  Otherwise, add it to the map.  The update operation is thread-safe.
+                            boolean newHammer = this.hammerMap.update(kmer, x -> x.setBadHammer(),
+                                    x -> this.strengthType.create(fid, roleId, neighbors, alwaysBad));
+                            if (!newHammer)
+                                commonCount++;
+                        }
                     }
                 }
             }
         }
-        log.info("{} kmers scanned, {} rejected, {} in common for role {}.", scanCount, badCount, commonCount, roleId);
+        log.info("{} kmers scanned, {} rejected, {} in common for role {}, {} duplicate features skipped.", scanCount, badCount, commonCount, roleId, skipCount);
         // Update the counters.
         synchronized (this) {
             this.repScanCount += scanCount;
