@@ -68,8 +68,6 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     private int hitColIdx;
     /** input column index for the hammer feature ID */
     private int fidColIdx;
-    /** input column index for the expected representative genome ID */
-    private int repColIdx;
     /** input column index for the strength score */
     private int strengthColIdx;
     /** current hammer genome */
@@ -261,8 +259,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         // Verify that we have the input columns we need.
         this.hitColIdx = inputStream.findField("location");
         this.fidColIdx = inputStream.findField("hammer_fid");
-        this.repColIdx = inputStream.findField("rep_id");
-        this.strengthColIdx = inputStream.findField("worth");
+        this.strengthColIdx = inputStream.findField("strength");
     }
 
     @Override
@@ -280,7 +277,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 // Here we are interested in this hit.
                 String hitLocString = hammerHitLocString.substring(this.residualIdx);
                 String hammerFid = line.get(this.fidColIdx);
-                String repId = line.get(this.repColIdx);
+                String repId = Feature.genomeOf(hammerFid);
                 double worth = line.getDouble(this.strengthColIdx);
                 HammerHit hit = this.new HammerHit(hitLocString, hammerFid, repId, worth);
                 this.hitSet.add(hit);
