@@ -68,6 +68,8 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
     private int hitColIdx;
     /** input column index for the hammer feature ID */
     private int fidColIdx;
+    /** input column index for the expected representative genome ID */
+    private int repColIdx;
     /** input column index for the strength score */
     private int strengthColIdx;
     /** current hammer genome */
@@ -259,6 +261,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         // Verify that we have the input columns we need.
         this.hitColIdx = inputStream.findField("location");
         this.fidColIdx = inputStream.findField("hammer_fid");
+        this.repColIdx = inputStream.findField("rep_id");
         this.strengthColIdx = inputStream.findField("strength");
     }
 
@@ -277,7 +280,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 // Here we are interested in this hit.
                 String hitLocString = hammerHitLocString.substring(this.residualIdx);
                 String hammerFid = line.get(this.fidColIdx);
-                String repId = Feature.genomeOf(hammerFid);
+                String repId = line.get(this.repColIdx);
                 double worth = line.getDouble(this.strengthColIdx);
                 HammerHit hit = this.new HammerHit(hitLocString, hammerFid, repId, worth);
                 this.hitSet.add(hit);
@@ -317,6 +320,10 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 this.hammerGenome = this.repGenomes.getGenome(hammerGenomeId);
                 log.info("Hammer genome {} loaded.", this.hammerGenome);
             }
+            // DEBUG
+            if (hammerGenomeId.contentEquals("224308.43"))
+                log.debug("Good hit.");
+            // DEBUG
             if (! hammerFid.contentEquals(hit.getSourceFeatureId())) {
                 // Here we have a new hammer feature.  This is a feature in the genome the hammer came from.
                 hammerFid = hit.getSourceFeatureId();
