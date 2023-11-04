@@ -298,7 +298,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         log.info("{} total hammer hits kept.", this.hitCount);
         // Now we process the individual hits to produce the output.
         log.info("Writing output.");
-        writer.println("target_fid\ttarget_function\tsim_to_hammer\tsim_to_rep\thammer\tworth\thammer_genome\thammer_fid\thammer_function\tgood_hit");
+        writer.println("target_fid\ttarget_function\tsim_to_hammer\tsim_to_rep\thammer\tworth\thammer_genome\thammer_fid\thammer_function\tgood_hit\tfun_match");
         // These will track the current hammer feature and genome.
         String hammerFid = "";
         String hammerGenomeId = "";
@@ -363,13 +363,18 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                     RnaKmers featKmers = new RnaKmers(feat.getDna(), hammerLen);
                     int simToHammer = featKmers.similarity(hammerKmers);
                     int simToRep = featKmers.similarity(repKmers);
-                    writer.format("%s\t%s\t%d\t%d%s%n", feat.getId(), feat.getFunction(), simToHammer, simToRep, trailer);
-                    if (! goodHit && feat.getFunction().contentEquals(hammerFunction))
+                    String featFunction = feat.getFunction();
+                    String matchHit = "";
+                    if (featFunction.contentEquals(hammerFunction)) {
                         funHits++;
+                        matchHit = "Y";
+                    }
+                    writer.format("%s\t%s\t%d\t%d%s\t%s%n", feat.getId(), feat.getFunction(), simToHammer, simToRep,
+                            trailer, matchHit);
                 }
             }
         }
-        log.info("{} good hits, {} bad hits, {} open-region hits, {} multi-feature hits, {} same-function bad hits.",
+        log.info("{} good hits, {} bad hits, {} open-region hits, {} multi-feature hits, {} same-function hits.",
                 goodHits, badHits, openHits, multiHits, funHits);
     }
 
