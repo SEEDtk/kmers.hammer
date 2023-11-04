@@ -311,6 +311,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
         int badHits = 0;
         int multiHits = 0;
         int openHits = 0;
+        int funHits = 0;
         for (HammerHit hit : this.hitSet) {
             // Remember the hammer length.
             int hammerLen = hit.getHammerLen();
@@ -320,10 +321,6 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                 this.hammerGenome = this.repGenomes.getGenome(hammerGenomeId);
                 log.info("Hammer genome {} loaded.", this.hammerGenome);
             }
-            // DEBUG
-            if (hammerGenomeId.contentEquals("224308.43"))
-                log.debug("Good hit.");
-            // DEBUG
             if (! hammerFid.contentEquals(hit.getSourceFeatureId())) {
                 // Here we have a new hammer feature.  This is a feature in the genome the hammer came from.
                 hammerFid = hit.getSourceFeatureId();
@@ -367,12 +364,14 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
                     int simToHammer = featKmers.similarity(hammerKmers);
                     int simToRep = featKmers.similarity(repKmers);
                     writer.format("%s\t%s\t%d\t%d%s%n", feat.getId(), feat.getFunction(), simToHammer, simToRep, trailer);
+                    if (! goodHit && feat.getFunction().contentEquals(hammerFunction))
+                        funHits++;
                 }
             }
         }
-        log.info("{} good hits, {} bad hits, {} open-region hits, {} multi-feature hits.", goodHits, badHits, openHits, multiHits);
+        log.info("{} good hits, {} bad hits, {} open-region hits, {} multi-feature hits, {} same-function bad hits.",
+                goodHits, badHits, openHits, multiHits, funHits);
     }
-
 
 
 }
