@@ -12,12 +12,16 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.theseed.counters.WeightMap;
 import org.theseed.genome.Genome;
 import org.theseed.io.TabbedLineReader;
@@ -26,6 +30,7 @@ import org.theseed.java.erdb.sqlite.SqliteDbConnection;
 import org.theseed.locations.Location;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
+import org.theseed.sequence.fastq.SeqRead;
 import org.theseed.utils.ParseFailureException;
 
 /**
@@ -35,12 +40,38 @@ import org.theseed.utils.ParseFailureException;
 class HammerDbTest {
 
     private static final File LOAD_FILE = new File("data", "hammers200.tbl");
+    protected static Logger log = LoggerFactory.getLogger(HammerDbTest.class);
+
 
     @Test
     void testHashHammerDb() throws IOException, ParseFailureException {
         HashHammerDb hammers = new HashHammerDb(LOAD_FILE);
         hammerDbTester(hammers);
         assertThat(hammers.getLoadFile(), equalTo(LOAD_FILE));
+    }
+
+    @Test
+    void testQualityStuff() throws IOException, ParseFailureException {
+        double q = SeqRead.qualChance("FFFFFFFFFFFFFFFFFFFF", 0, 20);
+        log.info("Normal quality value is {}.", q);
+        HashHammerDb hammers = new HashHammerDb(LOAD_FILE);
+        SeqRead.Part part1 = new SeqRead.Part("part1", "xxxxxxxgaggtcgacaacgacatcgcxxxxxxxxgcgatgtcgttgtcgacctcxxxxxxxx",
+                                                       "FFFFFFF,,,,,,,,,,,,,,,,,,,,FFFFFFFF::::::::::::::::::::FFFFFFFF");
+        SeqRead.Part part2 = new SeqRead.Part("part2", "xxxxxxxatcgcggcggctgccgacgcxxxxxxxxgcgatgtcgttgtcgacctcxxxxxxxx",
+                                                          "FFFFFFF,,,,,,,,,,,,,,,,,,,,FFFFFFFF::::::::::::::::::::FFFFFFFF");
+        List<SeqRead.Part> parts = List.of(part1, part2);
+        SortedSet<HammerDb.Hit> hits = hammers.findHits(parts, 0.0);
+        Iterator<HammerDb.Hit> iter = hits.iterator();
+        var hit1 = iter.next();
+        Location loc = hit1.getLoc();
+        assertThat(loc.getContigId(), equalTo("part1"));
+        assertThat(loc.getDna(part1.getSequence()), equalTo("gaggtcgacaacgacatcgc"));
+        assertThat(part1.getQual().substring(loc.getLeft() - 1, loc.getRight()), equalTo(",,,,,,,,,,,,,,,,,,,,"));
+        hit1 = iter.next();
+        loc = hit1.getLoc();
+        assertThat(loc.getContigId(), equalTo("part1"));
+        assertThat(loc.getDna(part1.getSequence()), equalTo("gaggtcgacaacgacatcgc"));
+        assertThat(part1.getQual().substring(loc.getLeft() - 1, loc.getRight()), equalTo("::::::::::::::::::::"));
     }
 
     @Test

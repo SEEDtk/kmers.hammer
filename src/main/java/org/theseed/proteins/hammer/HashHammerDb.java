@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.Map;
 
 import org.theseed.counters.WeightMap;
+import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.ParseFailureException;
@@ -131,9 +132,9 @@ public class HashHammerDb extends HammerDb {
     }
 
     @Override
-    protected void findHitsInternal(Collection<Hit> collection, Collection<Sequence> seqs, int kSize, boolean dir) {
+    protected void findHitsInternal(Collection<Hit> collection, Collection<? extends ISequence> seqs, int kSize, boolean dir) {
         log.debug("Scanning {} sequences for hammer hits with strand flag {}.", seqs.size(), dir);
-        for (Sequence seq : seqs) {
+        for (ISequence seq : seqs) {
             String dna = seq.getSequence();
             final int len = dna.length();
             String contigId = seq.getLabel();

@@ -23,6 +23,7 @@ import org.theseed.java.erdb.DbQuery;
 import org.theseed.java.erdb.DbRecord;
 import org.theseed.java.erdb.Relop;
 import org.theseed.java.erdb.SqlBuffer;
+import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
 
@@ -262,7 +263,7 @@ public class SqlHammerDb extends HammerDb {
     }
 
     @Override
-    protected void findHitsInternal(Collection<Hit> collection, Collection<Sequence> seqs, int kSize, boolean dir) {
+    protected void findHitsInternal(Collection<Hit> collection, Collection<? extends ISequence> seqs, int kSize, boolean dir) {
         // Again, we batch the queries for performance.  A batch consists of a map from each kmer to a list of hits
         // with dummy fids. The output collection will retain the hits that are found.
         try {
@@ -274,7 +275,7 @@ public class SqlHammerDb extends HammerDb {
                 query = this.buildBatchQuery(this.batchSize);
                 // We loop through the sequences, then loop through the kmers in each sequence.  We can't use any
                 // of the kmer iterators, because we need to know where each hammer was found.
-                for (Sequence seq : seqs) {
+                for (ISequence seq : seqs) {
                     String seqId = seq.getLabel();
                     String dna = seq.getSequence();
                     final int len = dna.length();

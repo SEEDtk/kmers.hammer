@@ -15,6 +15,7 @@ import org.theseed.utils.BaseProcessor;
  *  dbLoad			load a hammer database from a flat file
  *  binTest			separate contigs into bins using hammers
  *  contigTest		analyze a contig FASTA file using hammers
+ *  readTest		test a FASTQ sample and output unexpected hammer hits
  *  scanTest		analyze the results of a synthetic hammer test
  *  scanLocs		compare features hit by bad hammer matches in a synthetic test
  *  distTest		compute the ANI distances to the expected and actual choices in a synthetic test
@@ -27,7 +28,6 @@ import org.theseed.utils.BaseProcessor;
  *  binComp			do a comparison of bin reports
  *  filter			filter a hammer database by removing hammers in other genomes
  *  report			produce a report on a hammer database
- *  trimCheck		produce a FASTA file by comparing trimmed and untrimmed reads
  *  hammerStats		determine which hammers were found in a contig-hammer run and how many of each
  *  debugMeta		isolate bad hits in a synthetic-sample contigTest used for abundance measures
  *  sourMap			create a map between hammer fids and SOUR role IDs
@@ -66,6 +66,9 @@ public class App
         case "contigTest" :
             processor = new ContigTestProcessor();
             break;
+        case "readTest" :
+            processor = new ReadTestProcessor();
+            break;
         case "scanTest" :
             processor = new ContigTestAnalysisProcessor();
             break;
@@ -99,9 +102,6 @@ public class App
         case "report" :
             processor = new HammerReportProcessor();
             break;
-        case "trimCheck" :
-            processor = new TrimCheckProcessor();
-            break;
         case "hammerStats" :
             processor = new HammerStatsProcessor();
             break;
@@ -115,8 +115,8 @@ public class App
             processor = new GtoHammerReportProcessor();
             break;
         case "hCompare" :
-        	processor = new HammerCompareReportProcessor();
-        	break;
+            processor = new HammerCompareReportProcessor();
+            break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");
         }

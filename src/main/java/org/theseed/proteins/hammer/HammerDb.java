@@ -7,8 +7,11 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,7 +27,9 @@ import org.theseed.genome.Feature;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.locations.Location;
+import org.theseed.sequence.ISequence;
 import org.theseed.sequence.Sequence;
+import org.theseed.sequence.fastq.SeqRead;
 import org.theseed.utils.ParseFailureException;
 
 /**
@@ -49,6 +54,8 @@ public abstract class HammerDb {
     protected static Logger log = LoggerFactory.getLogger(HammerDb.class);
     /** kmer size to use */
     private int kmerSize;
+    /** number of quality rejections */
+    private int badQual;
     /** method to use for counting hits */
     private Method countMethod = Method.COUNT;
 
@@ -370,6 +377,13 @@ public abstract class HammerDb {
     }
 
     /**
+     * Construct a blank, empty hammer database.
+     */
+    protected HammerDb() {
+        this.badQual = 0;
+    }
+
+    /**
      * Load a hammer database from a hammer input file.
      *
      * @param inFile		input file containing the hammers
@@ -549,7 +563,7 @@ public abstract class HammerDb {
      * @param kSize			kmer size
      * @param dir			TRUE if this is a collection of plus strands, else FALSE
      */
-    protected abstract void findHitsInternal(Collection<Hit> collection, Collection<Sequence> seqs, int kSize, boolean dir);
+    protected abstract void findHitsInternal(Collection<Hit> collection, Collection<? extends ISequence> seqs, int kSize, boolean dir);
 
     /**
      * Compute the closest genomes to a set of sequences.  This is the internal version of the
@@ -617,6 +631,53 @@ public abstract class HammerDb {
      */
     public Method getCountMethod() {
         return this.countMethod;
+    }
+
+    /**
+     * This method computes the hammer hits above a certain quality level.
+     *
+     * @param values	collection of sequences with quality data
+     * @param minQual	minimum chance the hit is correct
+     *
+     * @return the set of hammer hits at or above the specified quality level
+     */
+    public SortedSet<Hit> findHits(Collection<SeqRead.Part> values, double minQual) {
+        // We need a map of the parts and a list of the reversed parts.
+        Map<String, SeqRead.Part> partMap = new HashMap<String, SeqRead.Part>(values.size() * 4 / 3 + 1);
+        List<SeqRead.Part> revParts = new ArrayList<SeqRead.Part>(values.size());
+        for (SeqRead.Part part : values) {
+            partMap.put(part.getLabel(), part);
+            SeqRead.Part rPart = SeqRead.Part.reverse(part);
+            revParts.add(rPart);
+        }
+        // Get the hits for this collection of sequences in both directions.
+        SortedSet<Hit> retVal = new TreeSet<Hit>();
+        this.findHitsInternal(retVal, values, this.kmerSize, true);
+        this.findHitsInternal(retVal, revParts, this.kmerSize, false);
+        // Now loop through the hits, removing low-quality ones.
+        Iterator<Hit> iter = retVal.iterator();
+        while (iter.hasNext()) {
+            Hit hit = iter.next();
+            Location hitLoc = hit.getLoc();
+            // Get the start of the hit location.  The length is always kmerSize.
+            int hitPos = hitLoc.getLeft() - 1;
+            // Get the sequence part hit.
+            SeqRead.Part part = partMap.get(hitLoc.getContigId());
+            // Compute the quality.
+            double qual = SeqRead.qualChance(part.getQual(), hitPos, this.kmerSize);
+            if (qual < minQual) {
+                iter.remove();
+                this.badQual++;
+            }
+        }
+        return retVal;
+    }
+
+    /**
+     * @return the number of bad-quality hits rejected
+     */
+    public int getBadQual() {
+        return this.badQual;
     }
 
 }
