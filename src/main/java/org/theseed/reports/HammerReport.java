@@ -12,6 +12,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
@@ -19,7 +20,6 @@ import org.theseed.proteins.Role;
 import org.theseed.proteins.RoleMap;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.proteins.hammer.HammerDb.Source;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This is the base class for all hammer reports.

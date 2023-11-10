@@ -14,10 +14,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.io.LineReader;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.utils.BasePipeProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This program takes as input a list of role IDs and a role definition file and outputs a smaller

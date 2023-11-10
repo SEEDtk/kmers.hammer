@@ -2,7 +2,7 @@ package org.theseed.kmers.hammer;
 
 import java.util.Arrays;
 
-import org.theseed.utils.BaseProcessor;
+import org.theseed.basic.BaseProcessor;
 
 /**
  * This program processes DNA hammers.  The commands are as follows.

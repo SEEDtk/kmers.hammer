@@ -16,13 +16,13 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Contig;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.BaseHammerUsageProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command processes a FASTA files against a set of hammers.  Hammers that are found in the source

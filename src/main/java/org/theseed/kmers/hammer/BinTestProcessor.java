@@ -18,6 +18,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.binning.BinBuilder;
 import org.theseed.binning.BlastTaxonomyComputer;
 import org.theseed.binning.HammerBinningRule;
@@ -31,7 +32,6 @@ import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.blast.BlastParms;
 import org.theseed.utils.BaseReportProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command reads a hammer analysis file for a metagenomic contig file and then splits its FASTA

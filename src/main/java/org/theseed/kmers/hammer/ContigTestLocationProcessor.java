@@ -16,6 +16,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
@@ -25,7 +26,6 @@ import org.theseed.locations.LocationFinder;
 import org.theseed.reports.NaturalSort;
 import org.theseed.sequence.RnaKmers;
 import org.theseed.utils.BasePipeProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command scans the results of a synthetic-sample hammer test and analyzes individual bad hits.  The command line

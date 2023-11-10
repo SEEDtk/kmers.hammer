@@ -17,11 +17,11 @@ import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Feature;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerSourMap;
 import org.theseed.utils.BasePipeProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command analyzes the output from a synthetic sample contig test, filtering out the incorrect hits.  These

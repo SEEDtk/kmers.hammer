@@ -29,12 +29,12 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.Shuffler;
 import org.theseed.counters.WeightMap;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.utils.BaseReportProcessor;
 import org.theseed.utils.IntegerList;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command compares bin reports.  We will load each report into a weight map and compare the weight maps on a sample-by

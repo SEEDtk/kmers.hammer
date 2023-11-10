@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.WeightMap;
 import org.theseed.genome.Contig;
 import org.theseed.genome.Feature;
@@ -30,7 +31,6 @@ import org.theseed.locations.Location;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.fastq.SeqRead;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This object represents a thor-hammer database.  Such databases are huge and take up a great deal of

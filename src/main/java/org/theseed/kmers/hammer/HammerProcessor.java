@@ -19,6 +19,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
@@ -28,7 +29,6 @@ import org.theseed.proteins.hammer.GenomeHammerFactory;
 import org.theseed.sequence.DnaKmers;
 import org.theseed.sequence.SequenceManager;
 import org.theseed.utils.BaseReportProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command will produce a table of hammers for all the genomes in a genome source.  A hammer is

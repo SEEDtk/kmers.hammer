@@ -21,6 +21,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.locations.Location;
 import org.theseed.proteins.hammer.HammerDb;
@@ -29,7 +30,6 @@ import org.theseed.sequence.fastq.ReadStream;
 import org.theseed.sequence.fastq.SampleDescriptor;
 import org.theseed.sequence.fastq.SeqRead;
 import org.theseed.utils.BaseHammerUsageProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command is used to analyze the quality of hammer hits against reads.  The input should be FASTQ samples in a directory,

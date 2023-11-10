@@ -20,6 +20,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Contig;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
@@ -34,7 +35,6 @@ import org.theseed.sequence.seeds.ProteinFinder;
 import org.theseed.sequence.seeds.filters.HammerDupFilter;
 import org.theseed.sequence.seeds.filters.HammerFeatureFilter;
 import org.theseed.utils.BasePipeProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command uses a protein-finder to compute hammers for a repgen set.  The standard input should contain the repgen set's

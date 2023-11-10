@@ -11,10 +11,10 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.erdb.utils.BaseDbProcessor;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.proteins.hammer.SqlHammerDb;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This is a simple command that loads an ERDB-style hammer database from the flat file produced

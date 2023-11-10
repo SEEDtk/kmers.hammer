@@ -7,10 +7,10 @@ import java.io.File;
 import java.io.IOException;
 
 import org.kohsuke.args4j.Argument;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerSourMap;
 import org.theseed.utils.BaseInputProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This is a basic command that takes a hammer load file as input and outputs a SOUR map save file.

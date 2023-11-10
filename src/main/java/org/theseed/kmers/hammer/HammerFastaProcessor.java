@@ -13,14 +13,14 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.BaseProcessor;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Contig;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
 import org.theseed.proteins.kmers.reps.RepGenomeDb;
 import org.theseed.sequence.FastaOutputStream;
 import org.theseed.sequence.Sequence;
-import org.theseed.utils.BaseProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command reads all the genomes from a genome source and converts them into a single DNA FASTA file containing

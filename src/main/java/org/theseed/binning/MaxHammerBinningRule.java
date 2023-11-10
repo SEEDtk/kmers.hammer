@@ -3,8 +3,8 @@
  */
 package org.theseed.binning;
 
+import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.CountMap;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This binning rule selects the bin with the highest number of hits, provided it is

@@ -9,12 +9,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.WeightMap;
 import org.theseed.genome.Genome;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.proteins.hammer.HammerDb.Source;
 import org.theseed.sequence.Sequence;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This report scans all the hammers in a representative genome and insures they belong to its subset of the

@@ -14,12 +14,12 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.iterator.GenomeSource;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.reports.HammerReport;
 import org.theseed.utils.BaseHammerUsageProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command produces a report on the hammers.  The positional parameter is the name of the representative

@@ -17,6 +17,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.WeightMap;
 import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
@@ -24,7 +25,6 @@ import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.Sequence;
 import org.theseed.utils.BaseHammerUsageProcessor;
-import org.theseed.utils.ParseFailureException;
 
 /**
  * This command will produce a report on the hammers in a set of genomes.  For each genome, we will count the
