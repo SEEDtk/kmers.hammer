@@ -494,6 +494,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         }
         // Try to keep the output aligned on sample boundaries so we can restart.
         writer.flush();
+        log.info("Sample {} completed.", sampleId);
     }
 
     @Override
