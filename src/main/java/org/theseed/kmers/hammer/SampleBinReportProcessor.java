@@ -337,7 +337,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                     if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 10000) {
                         lastMessage = System.currentTimeMillis();
                         double rate = mySeqsIn * 1000.0 / (lastMessage - start);
-                        log.info("{} sequences read, {} sequences/second.", mySeqsIn, sampleId, rate);
+                        log.info("{} sequences read in {}, {} sequences/second.", mySeqsIn, sampleId, rate);
                     }
                 }
                 // Convert the read to a sequence and add it to the batch.
@@ -494,6 +494,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         }
         // Try to keep the output aligned on sample boundaries so we can restart.
         writer.flush();
+        log.info("Sample {} completed.", sampleId);
     }
 
     @Override

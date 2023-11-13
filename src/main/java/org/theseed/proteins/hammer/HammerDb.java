@@ -664,7 +664,8 @@ public abstract class HammerDb {
             // Get the sequence part hit.
             SeqRead.Part part = partMap.get(hitLoc.getContigId());
             // Compute the quality.
-            double qual = SeqRead.qualChance(part.getQual(), hitPos, this.kmerSize);
+            String qString = part.getQual();
+            double qual = SeqRead.qualChance(qString, hitPos, this.kmerSize);
             if (qual < minQual) {
                 iter.remove();
                 this.badQual++;
