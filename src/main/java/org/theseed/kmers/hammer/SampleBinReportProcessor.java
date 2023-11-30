@@ -133,7 +133,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private int seqBatchSize;
 
     /** name of previous report file */
-    @Option(name = "--resume", metaVar = "binReport.old.tbl", usage = "if specified, the name of a previous report containing results for samples that do not need to be rerun")
+    @Option(name = "--resume", metaVar = "binReport.old.tbl", usage = "if specified, the name of a previous report containing results for samples that do not need to be rerun (cannot also be the output file)")
     private File resumeFile;
 
     /** scale-suppression flag */
