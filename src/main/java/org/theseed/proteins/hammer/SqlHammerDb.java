@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.theseed.counters.CountMap;
-import org.theseed.counters.WeightMap;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.DbLoader;
 import org.theseed.java.erdb.DbQuery;
@@ -26,6 +25,7 @@ import org.theseed.java.erdb.SqlBuffer;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
+import org.theseed.stats.WeightMap;
 
 /**
  * This is a hammer database stored in an SQL database.  It is slower than the in-memory

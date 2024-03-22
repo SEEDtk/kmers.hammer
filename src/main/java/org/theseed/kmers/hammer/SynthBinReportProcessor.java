@@ -16,10 +16,10 @@ import org.kohsuke.args4j.Argument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
-import org.theseed.counters.WeightMap;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
+import org.theseed.stats.WeightMap;
 import org.theseed.utils.BaseReportProcessor;
 
 /**

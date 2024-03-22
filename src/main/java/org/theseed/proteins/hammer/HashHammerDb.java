@@ -11,10 +11,10 @@ import java.util.HashSet;
 import java.util.Map;
 
 import org.theseed.basic.ParseFailureException;
-import org.theseed.counters.WeightMap;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
+import org.theseed.stats.WeightMap;
 
 /**
  * This object implements a thor-hammer database using an in-memory hash.  It is much more memory-intensive

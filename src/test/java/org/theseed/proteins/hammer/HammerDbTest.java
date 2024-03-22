@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
-import org.theseed.counters.WeightMap;
 import org.theseed.genome.Genome;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.java.erdb.DbConnection;
@@ -32,6 +31,7 @@ import org.theseed.locations.Location;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.fastq.SeqRead;
+import org.theseed.stats.WeightMap;
 
 /**
  * @author Bruce Parrello

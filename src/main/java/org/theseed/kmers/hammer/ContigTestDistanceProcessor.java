@@ -18,7 +18,6 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
-import org.theseed.counters.WeightMap;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
 import org.theseed.genome.GenomeDirectory;
@@ -27,6 +26,7 @@ import org.theseed.genome.distance.methods.Measurer;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.proteins.kmers.reps.RepGenomeDb;
+import org.theseed.stats.WeightMap;
 import org.theseed.utils.BasePipeProcessor;
 import org.theseed.utils.StringPair;
 

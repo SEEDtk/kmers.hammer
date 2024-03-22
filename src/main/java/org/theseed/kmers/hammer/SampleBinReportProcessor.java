@@ -26,7 +26,6 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
-import org.theseed.counters.WeightMap;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.ClassStrategy;
 import org.theseed.proteins.hammer.HammerDb;
@@ -34,6 +33,7 @@ import org.theseed.sequence.fastq.FastqSampleGroup;
 import org.theseed.sequence.fastq.ReadStream;
 import org.theseed.sequence.fastq.SampleDescriptor;
 import org.theseed.sequence.fastq.SeqRead;
+import org.theseed.stats.WeightMap;
 import org.theseed.utils.BaseHammerUsageProcessor;
 
 /**

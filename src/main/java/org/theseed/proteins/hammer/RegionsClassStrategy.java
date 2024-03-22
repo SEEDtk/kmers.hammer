@@ -5,8 +5,8 @@ package org.theseed.proteins.hammer;
 
 import java.util.Collection;
 
-import org.theseed.counters.WeightMap;
 import org.theseed.proteins.hammer.HammerDb.Hit;
+import org.theseed.stats.WeightMap;
 
 /**
  * This method assigns only a single classification group to a sequence.  The group with the majority of hits

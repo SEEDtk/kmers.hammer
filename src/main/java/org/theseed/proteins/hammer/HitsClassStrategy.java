@@ -5,7 +5,7 @@ package org.theseed.proteins.hammer;
 
 import java.util.Collection;
 
-import org.theseed.counters.WeightMap;
+import org.theseed.stats.WeightMap;
 
 /**
  * This is the simplest classification strategy for a hammer sequence.  We simply count the hits for each genome.
