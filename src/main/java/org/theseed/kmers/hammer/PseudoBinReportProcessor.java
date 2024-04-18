@@ -18,7 +18,7 @@ import org.slf4j.Logger;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.stats.WeightMap;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.basic.BaseReportProcessor;
 
 
 /**

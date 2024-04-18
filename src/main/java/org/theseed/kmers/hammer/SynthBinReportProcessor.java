@@ -20,7 +20,7 @@ import org.theseed.io.TabbedLineReader;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.stats.WeightMap;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.basic.BaseReportProcessor;
 
 /**
  * This command reads a synthetic-sample FASTA file and converts it into a bin report.  It is used to compare

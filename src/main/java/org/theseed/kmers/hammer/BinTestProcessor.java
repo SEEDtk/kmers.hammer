@@ -31,7 +31,7 @@ import org.theseed.io.TabbedLineReader;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.blast.BlastParms;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.basic.BaseReportProcessor;
 
 /**
  * This command reads a hammer analysis file for a metagenomic contig file and then splits its FASTA

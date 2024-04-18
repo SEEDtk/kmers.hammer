@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.stats.WeightMap;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.basic.BaseReportProcessor;
 
 /**
  * This command produces a bin report based on Kraken output files in a sample group.  The Kraken files should be

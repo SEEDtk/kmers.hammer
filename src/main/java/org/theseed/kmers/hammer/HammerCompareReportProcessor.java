@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HashHammerDb;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.basic.BaseReportProcessor;
 
 /**
  * This command compares two hammer databases and outputs hammers found only in one or the other.  The positional

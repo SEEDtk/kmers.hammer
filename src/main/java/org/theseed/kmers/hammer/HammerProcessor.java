@@ -28,7 +28,7 @@ import org.theseed.proteins.RoleMap;
 import org.theseed.proteins.hammer.GenomeHammerFactory;
 import org.theseed.sequence.DnaKmers;
 import org.theseed.sequence.SequenceManager;
-import org.theseed.utils.BaseReportProcessor;
+import org.theseed.basic.BaseReportProcessor;
 
 /**
  * This command will produce a table of hammers for all the genomes in a genome source.  A hammer is
