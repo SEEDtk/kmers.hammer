@@ -251,23 +251,25 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
             T retVal = null;
             int subIdx = this.getSubIdx(code);
             Node curr = this.getChain(subIdx);
-            if (curr.matches(code)) {
-                // The first node is us (the most common case), so we simply replace it
-                // with its successor.
-                this.table[subIdx] = curr.getNextNode();
-                retVal = curr.getValue();
-            } else {
-                // Search for this hammer in the chain.
-                Node prev = curr;
-                curr = curr.nextNode;
-                while (curr != null && ! curr.matches(code)) {
-                    prev = curr;
-                    curr = curr.getNextNode();
-                }
-                if (curr != null) {
-                    // Here we found a match.
-                    prev.setNextNode(curr.getNextNode());
+            if (curr != null) {
+                if (curr.matches(code)) {
+                    // The first node is us (the most common case), so we simply replace it
+                    // with its successor.
+                    this.table[subIdx] = curr.getNextNode();
                     retVal = curr.getValue();
+                } else {
+                    // Search for this hammer in the chain.
+                    Node prev = curr;
+                    curr = curr.nextNode;
+                    while (curr != null && ! curr.matches(code)) {
+                        prev = curr;
+                        curr = curr.getNextNode();
+                    }
+                    if (curr != null) {
+                        // Here we found a match.
+                        prev.setNextNode(curr.getNextNode());
+                        retVal = curr.getValue();
+                    }
                 }
             }
             return retVal;

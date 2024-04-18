@@ -21,6 +21,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
+import org.theseed.counters.CountMap;
 import org.theseed.genome.Contig;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
@@ -68,6 +69,7 @@ import org.theseed.utils.BasePipeProcessor;
  * --reject		if specified, a file to contain the hammers rejected due to conflicts
  * --pegFilter	filter for features to use in the finder (default ALL)
  * --dupFilter	algorithm to use for processing multi-occurring roles in a genome (default KEEP)
+ * --maxCount	maximum number of times a hammer can be found in its own genome during cleaning (default 10)
  *
  * @author Bruce Parrello
  *
@@ -152,6 +154,10 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
     @Option(name = "--dupFilter", usage = "filter for duplicate features to select for hammer generation")
     private HammerDupFilter.Type dupFilterType;
 
+    /** maximum number of times a hammer can duplicate in a genome */
+    @Option(name = "--maxCount", metaVar = "1", usage = "maximum number of duplicates allowed for a hammer in a genome")
+    private int maxCount;
+
     /** protein-finder directory */
     @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
     private File finderDir;
@@ -171,6 +177,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         this.rejectFile = null;
         this.pegFilterType = HammerFeatureFilter.Type.ALL;
         this.dupFilterType = HammerDupFilter.Type.KEEP;
+        this.maxCount = 10;
     }
 
     @Override
@@ -187,6 +194,8 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
             throw new ParseFailureException("Minimum neighborhood size must be positive.");
         if (this.maxRepeat <= 0.25 || this.maxRepeat > 1.0)
             throw new ParseFailureException("Maximum repeat fraction must be between 0.25 and 1.0.");
+        if (this.maxCount < 1)
+            throw new ParseFailureException("Maximum-duplicate count must be at least 1.");
         // Set up the cleaning directory.
         if (this.repDir == null) {
             log.info("No cleaning step will be performed.");
@@ -441,7 +450,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
 
     /**
      * This method scans a genome for hammers.  A hammer found in a genome that is different from its target
-     * genome is removed.
+     * genome is removed.  A hammer that occurs too many times in its target genome is also removed.
      *
      * @param repId		ID of the representative genome to scan
      *
@@ -451,6 +460,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         Genome repGenome = this.repGenomes.getGenome(repId);
         log.info("Scanning genome {} for cleaning step.", repGenome);
         int retVal = 0;
+        CountMap<String> counts = new CountMap<String>();
         // Scan all the contig sequences in both directions.
         for (Contig contig : repGenome.getContigs()) {
             String seq = contig.getSequence();
@@ -465,9 +475,26 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
                         // If the remove returned NULL, someone else got to this hammer first.
                         if (testScore != null)
                             retVal++;
+                    } else {
+                        // Here the hammer is in the same genome.  Count it.  Counts greater than
+                        // the maximum are removed.
+                        counts.count(kmer);
                     }
                 }
             }
+        }
+        int dups = 0;
+        for (var counter : counts.counts()) {
+            if (counter.getCount() > this.maxCount) {
+                HammerScore testScore = this.hammerMap.remove(counter.getKey());
+                // If the remove returned NULL, someone else got to this hammer first.
+                if (testScore != null)
+                    dups++;
+            }
+        }
+        if (dups > 0) {
+            log.info("{} duplicate hammers removed from {}.", dups, repGenome);
+            retVal += dups;
         }
         log.info("{} hammers cleaned using {}.", retVal, repGenome);
         return retVal;
