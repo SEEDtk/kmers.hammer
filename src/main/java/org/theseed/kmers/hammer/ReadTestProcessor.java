@@ -37,7 +37,8 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  * specified for each sample, and hits to these genomes will be skipped on the report.
  *
  * The blacklist is specified in a tab-delimited file with labels.  The first column contains sample IDs, and the second contains a
- * comma-delimited list of genome IDs to be skipped in the detail report.
+ * comma-delimited list of genome IDs to be skipped in the detail report.  In essence, the blacklist contains the genome IDs we
+ * expect to find in the sample, and other genome IDs are considered suspicious.
  *
  * The positional parameter is the name of the input sample directory.
  *
