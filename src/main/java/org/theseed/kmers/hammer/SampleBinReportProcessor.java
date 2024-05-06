@@ -317,6 +317,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // Get local versions of the counters.
         int mySeqsIn = 0;
         int myBatchCount = 0;
+        int rejectCount = 0;
         // Denote the sample is bad.
         boolean badSample = true;
         // Create a stats object to pass to the batch processor.
@@ -332,7 +333,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 double coverage = seqRead.getCoverage();
                 double expError = seqRead.getExpectedErrors();
                 if (expError >= this.badBaseFilter)
-                    this.qualReject++;
+                    rejectCount++;
                 else {
                     // Insure there is room in this batch for this sequence.
                     if (batchSize >= this.maxBatchDnaSize || coverage != batchCoverage) {
@@ -385,8 +386,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             badSample = true;
         } else {
             log.info(
-                    "Sample complete: {} contained {} sequences in {} batches.  {} genomes scored.  {} ambiguous sequences, {} sequences classified, {} per sequence.",
-                    sampleId, mySeqsIn, myBatchCount, results.size(), stats.ambigCount, stats.hitSeqCount,
+                    "Sample complete: {} contained {} sequences in {} batches.  {} genomes scored.  {} ambiguous, {} rejected, {} sequences classified, {} per sequence.",
+                    sampleId, mySeqsIn, myBatchCount, results.size(), stats.ambigCount, rejectCount, stats.hitSeqCount,
                     ((double) stats.hitCount) / stats.hitSeqCount);
             // Output the genome weights.
             this.writeSample(writer, sampleId, results);
@@ -399,6 +400,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             this.sampleCount++;
             if (badSample)
                 this.badSamples.add(sampleId);
+            this.qualReject += rejectCount;
         }
     }
 
