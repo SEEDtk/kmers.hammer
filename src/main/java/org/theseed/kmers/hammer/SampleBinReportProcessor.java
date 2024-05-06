@@ -64,6 +64,7 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  *  --diff 		minimum number of additional hits for a region-based classification
  *  --resume 	name of an existing report file containing data from samples already run
  *  --unscaled 	if specified, hit weights will not be scaled by length and coverage
+ *  --filter	maximum number of expected bad base pairs for an acceptable read
  *
  * @author Bruce Parrello
  *
@@ -118,11 +119,13 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Option(name = "--min", metaVar = "20.0", usage = "minimum acceptable score for a genome presence")
     private double minScore;
 
-    /**
-     * minimum number of additional hits for a region-based determination to count
-     */
+    /** minimum number of additional hits for a region-based determination to count */
     @Option(name = "--diff", metaVar = "5", usage = "minimum number of additional hits required to qualify as a regional group classification")
     private double minDiff;
+
+    /** maximum number of expected errors allowed in an acceptable read */
+    @Option(name = "--filter", metaVar = "2.0", usage = "number of expected errors at or beyond which a read is rejected")
+    private double badBaseFilter;
 
     /** minimum acceptable quality for an input sequence */
     @Option(name = "--qual", metaVar = "0.9", usage = "minimum acceptable sequence quality (0 to 99)")
@@ -178,6 +181,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.strategyType = ClassStrategy.Type.HITS;
         this.minDiff = 2;
         this.resumeFile = null;
+        this.badBaseFilter = 1.0;
     }
 
     @Override
@@ -185,6 +189,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // Validate the minimum score.
         if (this.minScore < 0.0)
             throw new ParseFailureException("Minimum score cannot be negative.");
+        // Validate the bad-base filter.
+        if (this.badBaseFilter <= 0.0)
+            throw new ParseFailureException("Bad-base filter limit must be positive.");
         // Validate the minimum difference.
         if (this.minDiff <= 0.0)
             throw new ParseFailureException("Minimum hit difference must be greater than 0.");
@@ -323,28 +330,33 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 SeqRead seqRead = inStream.next();
                 mySeqsIn++;
                 double coverage = seqRead.getCoverage();
-                // Insure there is room in this batch for this sequence.
-                if (batchSize >= this.maxBatchDnaSize || coverage != batchCoverage) {
-                    // Here we must process the current batch. Get the scores and
-                    // add them in.
-                    myBatchCount++;
-                    WeightMap scores = this.processBatch(batch, batchCoverage, stats);
-                    results.accumulate(scores);
-                    // Set up for the new sequence.
-                    batchCoverage = coverage;
-                    batch.clear();
-                    batchSize = 0;
-                    if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 10000) {
-                        lastMessage = System.currentTimeMillis();
-                        double rate = mySeqsIn * 1000.0 / (lastMessage - start);
-                        log.info("{} sequences read in {}, {} sequences/second.", mySeqsIn, sampleId, rate);
+                double expError = seqRead.getExpectedErrors();
+                if (expError >= this.badBaseFilter)
+                    this.qualReject++;
+                else {
+                    // Insure there is room in this batch for this sequence.
+                    if (batchSize >= this.maxBatchDnaSize || coverage != batchCoverage) {
+                        // Here we must process the current batch. Get the scores and
+                        // add them in.
+                        myBatchCount++;
+                        WeightMap scores = this.processBatch(batch, batchCoverage, stats);
+                        results.accumulate(scores);
+                        // Set up for the new sequence.
+                        batchCoverage = coverage;
+                        batch.clear();
+                        batchSize = 0;
+                        if (log.isInfoEnabled() && System.currentTimeMillis() - lastMessage > 10000) {
+                            lastMessage = System.currentTimeMillis();
+                            double rate = mySeqsIn * 1000.0 / (lastMessage - start);
+                            log.info("{} sequences read in {}, {} sequences/second.", mySeqsIn, sampleId, rate);
+                        }
                     }
+                    // Convert the read to a sequence and add it to the batch.
+                    final String seqId = seqRead.getLabel();
+                    SeqRead.Part seq = seqRead.getSequence();
+                    batch.put(seqId, seq);
+                    batchSize += seq.length();
                 }
-                // Convert the read to a sequence and add it to the batch.
-                final String seqId = seqRead.getLabel();
-                SeqRead.Part seq = seqRead.getSequence();
-                batch.put(seqId, seq);
-                batchSize += seq.length();
             }
             // Process the residual batch.
             if (batch.size() > 0) {
