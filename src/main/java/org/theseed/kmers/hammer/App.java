@@ -32,6 +32,7 @@ import org.theseed.basic.BaseProcessor;
  *  debugMeta		isolate bad hits in a synthetic-sample contigTest used for abundance measures
  *  sourMap			create a map between hammer fids and SOUR role IDs
  *  hCompare		compare two hammer databases
+ *  sampEval		evaluate the results of different sampReport tests
  */
 public class App
 {
@@ -116,6 +117,9 @@ public class App
             break;
         case "hCompare" :
             processor = new HammerCompareReportProcessor();
+            break;
+        case "sampEval" :
+            processor = new SampReportEvalProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");
