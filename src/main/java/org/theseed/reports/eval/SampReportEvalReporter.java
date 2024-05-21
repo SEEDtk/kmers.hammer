@@ -115,15 +115,22 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
 
     }
 
-
     /**
      * This enumeration describes the implemented report types.
      */
     public static enum Type {
+        /** summary of good and bad hits in each report */
         QUALITY {
             @Override
             public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
                 return new QualitySampReportEvalReporter(processor, writer);
+            }
+        },
+        /** summary of individual sample performance in each report */
+        SAMPLE {
+            @Override
+            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
+                return new SamplingSampReportEvalReporter(processor, writer);
             }
         };
 

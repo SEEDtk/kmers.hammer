@@ -5,8 +5,7 @@ package org.theseed.reports.eval;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.SortedMap;
 
 import org.theseed.stats.WeightMap;
 
@@ -19,13 +18,7 @@ import org.theseed.stats.WeightMap;
  * @author Bruce Parrello
  *
  */
-public class QualitySampReportEvalReporter extends SampReportEvalReporter {
-
-    // FIELDS
-    /** name of the current report */
-    private String reportName;
-    /** map of samples to weight maps for the current report */
-    private Map<String, WeightMap> countMap;
+public class QualitySampReportEvalReporter extends SummarySampReportEvalReporter {
 
     /**
      * Construct a quality report.
@@ -35,31 +28,16 @@ public class QualitySampReportEvalReporter extends SampReportEvalReporter {
      */
     public QualitySampReportEvalReporter(IParms processor, PrintWriter writer) {
         super(processor, writer);
-        // Create the count map.
-        this.countMap = new HashMap<String, WeightMap>();
-        // Denote no report is active.
-        this.reportName = null;
         // Write the header line.
         writer.println("report_name\tsamples\tgood_samples\tbad_samples\tgood_hits\tgood_hit%\tbad_hits\tbad_hit%");
     }
 
     @Override
-    public void openFile(String name) {
-        this.reportName = name;
-        // Erase all the current counts.
-        this.countMap.clear();
+    protected void initFile(String name) {
     }
 
     @Override
-    public void recordHits(SampleDescriptor desc, String repId, String repName, double count) {
-        String sampleId = desc.getSampleId();
-        // Get the weight map for this sample.
-        WeightMap counters = this.countMap.computeIfAbsent(sampleId, x -> new WeightMap());
-        counters.count(repId, count);
-    }
-
-    @Override
-    public void closeFile() throws IOException {
+    protected void summarizeFile(String reportName, SortedMap<String, WeightMap> countMap) throws IOException {
         // Total up the data for this file.
         double totalGood = 0.0;
         double totalBad = 0.0;
@@ -67,13 +45,13 @@ public class QualitySampReportEvalReporter extends SampReportEvalReporter {
         int badSamples = 0;
         // We loop through the samples.  For each sample, we process its weight map and determine the
         // highest-weight repgen.  If it's the expected one for the sample, the sample is good.
-        for (var sampEntry : this.countMap.entrySet()) {
+        for (var sampEntry : countMap.entrySet()) {
             String sampleId = sampEntry.getKey();
             WeightMap counters = sampEntry.getValue();
             // Get the expected repgen.
             SampleDescriptor desc = this.getSample(sampleId);
             if (desc == null)
-                throw new IOException("Invalid sample ID " + sampleId + " found in file " + this.reportName + ".");
+                throw new IOException("Invalid sample ID " + sampleId + " found in file " + reportName + ".");
             String expected = desc.getRepId();
             // Get the number of hits on the expected repgen and set up to count.
             double good = counters.getCount(expected);
@@ -107,13 +85,12 @@ public class QualitySampReportEvalReporter extends SampReportEvalReporter {
             pctGood = totalGood * 100.0 / totHits;
             pctBad = totalBad * 100.0 / totHits;
         }
-        writer.println(this.reportName + "\t" + totSamples + "\t" + goodSamples + "\t" + badSamples
+        writer.println(reportName + "\t" + totSamples + "\t" + goodSamples + "\t" + badSamples
                 + "\t" + totalGood + "\t" + pctGood + "\t" + totalBad + "\t" + pctBad);
     }
 
     @Override
     public void closeReport() {
     }
-
 
 }
