@@ -38,12 +38,12 @@
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/commons-codec/commons-codec/1.11/commons-codec-1.11.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/org/apache/httpcomponents/fluent-hc/4.5.13/fluent-hc-4.5.13.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/org/apache/commons/commons-collections4/4.4/commons-collections4-4.4.jar"/>
-            <fileset dir="${dir.workspace}/git/java.erdb/target/classes"/>
+            <fileset dir="${dir.workspace}/git/brc.parent/java.erdb/target/classes"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/org/xerial/sqlite-jdbc/3.36.0.3/sqlite-jdbc-3.36.0.3.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/com/google/protobuf/protobuf-java/3.11.4/protobuf-java-3.11.4.jar"/>
-            <fileset dir="${dir.workspace}/git/genome.distance/target/classes"/>
-            <fileset dir="${dir.workspace}/git/excel.utils/target/classes"/>
+            <fileset dir="${dir.workspace}/git/brc.parent/distance/target/classes"/>
+            <fileset dir="${dir.workspace}/git/brc.parent/excel.utils/target/classes"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/org/apache/poi/poi/5.0.0/poi-5.0.0.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/org/slf4j/jcl-over-slf4j/1.7.30/jcl-over-slf4j-1.7.30.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="${env.HOME}/.m2/repository/com/zaxxer/SparseBitSet/1.2/SparseBitSet-1.2.jar"/>
