@@ -36,6 +36,43 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
     }
 
     /**
+     * This enumeration describes the implemented report types.
+     */
+    public static enum Type {
+        /** listing of the best reports for each sample */
+        RATINGS {
+            @Override
+            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
+                return new RatingSampReportEvalReporter(processor, writer);
+            }
+        },
+        /** summary of good and bad hits in each report */
+        QUALITY {
+            @Override
+            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
+                return new QualitySampReportEvalReporter(processor, writer);
+            }
+        },
+        /** summary of individual sample performance in each report */
+        SAMPLE {
+            @Override
+            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
+                return new SamplingSampReportEvalReporter(processor, writer);
+            }
+        };
+
+        /**
+         * Create a reporter of this type
+         *
+         * @param processor		controlling command processor
+         * @param writer		output print writer
+         *
+         * @return a reporter of this type
+         */
+        public abstract SampReportEvalReporter create(IParms processor, PrintWriter writer);
+    }
+
+    /**
      * This class describes the data we need for a sample from the input file.
      */
     public static class SampleDescriptor {
@@ -113,36 +150,6 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
             this.repId = repId;
         }
 
-    }
-
-    /**
-     * This enumeration describes the implemented report types.
-     */
-    public static enum Type {
-        /** summary of good and bad hits in each report */
-        QUALITY {
-            @Override
-            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
-                return new QualitySampReportEvalReporter(processor, writer);
-            }
-        },
-        /** summary of individual sample performance in each report */
-        SAMPLE {
-            @Override
-            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
-                return new SamplingSampReportEvalReporter(processor, writer);
-            }
-        };
-
-        /**
-         * Create a reporter of this type
-         *
-         * @param processor		controlling command processor
-         * @param writer		output print writer
-         *
-         * @return a reporter of this type
-         */
-        public abstract SampReportEvalReporter create(IParms processor, PrintWriter writer);
     }
 
     /**
