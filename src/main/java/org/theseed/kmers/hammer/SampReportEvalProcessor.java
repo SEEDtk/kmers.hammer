@@ -71,7 +71,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     private String repCol;
 
     /** output format for the report */
-    @Option(name = "--format", metaVar = "output format for the report")
+    @Option(name = "--format", usage = "output format for the report")
     private SampReportEvalReporter.Type reportType;
 
     /** list of input sample bin reports */
