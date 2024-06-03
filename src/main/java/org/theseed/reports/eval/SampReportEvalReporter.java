@@ -5,7 +5,6 @@ package org.theseed.reports.eval;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-
 import org.theseed.reports.BaseWritingReporter;
 
 /**
@@ -32,6 +31,11 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
          * @param sampleId	ID of the sample whose descriptor is desired
          */
         public SampleDescriptor getDescriptor(String sampleId);
+
+        /**
+         * @return the distance between two genomes, or NaN if unknown
+         */
+        public double getDistance(String genome1, String genome2);
 
     }
 
@@ -201,6 +205,16 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
      */
     public SampleDescriptor getSample(String sampleId) {
         return this.processor.getDescriptor(sampleId);
+    }
+
+    /**
+     * @return the distance between two genomes, or NaN if it is unknown
+     *
+     * @param g1	ID of the first genome
+     * @param g2	ID of the second genome
+     */
+    public double getDistance(String g1, String g2) {
+        return this.processor.getDistance(g1, g2);
     }
 
 }

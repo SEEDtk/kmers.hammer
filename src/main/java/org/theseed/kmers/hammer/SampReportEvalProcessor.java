@@ -22,6 +22,7 @@ import org.theseed.io.TabbedLineReader;
 import org.theseed.reports.eval.SampReportEvalReporter;
 import org.theseed.reports.eval.SampReportEvalReporter.SampleDescriptor;
 import org.theseed.utils.BasePipeProcessor;
+import org.theseed.utils.StringPair;
 
 /**
  * This command analyzes the resullts of one or more hammer tests against FASTQ samples and compares the results.
@@ -30,6 +31,10 @@ import org.theseed.utils.BasePipeProcessor;
  * For each sample, the report should have the sample ID in a column named "sample_id", the organism ID and name
  * in "genome_id" and "genome_name", and the expected representative ID in a column named by the command-line options.
  * The input file can contain extra samples:  these will be ignored.
+ *
+ * Some reports can make use of genome distance information.  In this case, a distance file must be provided.  The
+ * genome IDs must be in columns named "id1" and "id2".  The distance value itself is specified by a parameter,
+ * but defaults to the last column.
  *
  * The reports will be identified by base name with the extension removed.  Multiple report types are supported.
  *
@@ -42,6 +47,8 @@ import org.theseed.utils.BasePipeProcessor;
  * -c	index (1-based) or name of input column name for expected representative (default "rep_id")
  *
  * --format		type of report to output (default QUALITY)
+ * --distFile	name of a file containing genome distances, from the genome.distance methods command (optional)
+ * --dist		index (1-based) or name of column containing thge distance to use in the distance file (default "0")
  *
  * @author Bruce Parrello
  *
@@ -63,6 +70,8 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     private Map<String, Descriptor> sampMap;
     /** output reporter */
     private SampReportEvalReporter reporter;
+    /** distance table */
+    private Map<StringPair, Double> distTable;
 
     // COMMAND-LINE OPTIONS
 
@@ -73,6 +82,14 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     /** output format for the report */
     @Option(name = "--format", usage = "output format for the report")
     private SampReportEvalReporter.Type reportType;
+
+    /** distance file to use for distance-based reports */
+    @Option(name = "--distFile", metaVar = "genomes.dists.tbl", usage = "name of an optional file containing genome distances")
+    private File distFile;
+
+    /** column containing the distances in the distance file */
+    @Option(name = "--distCol", metaVar = "ANI", usage = "index (1-based) or name of distance column in distance file")
+    private String distCol;
 
     /** list of input sample bin reports */
     @Argument(index = 0, metaVar = "reportFile1 reportFile2 ...", usage = "files containing sample bin reports to evaluate")
@@ -115,6 +132,25 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                 throw new FileNotFoundException("Input file " + reportFile + " is not found or unreadable.");
         }
         log.info("{} input report files specified.", this.reportFiles.size());
+        // Check for a distance file.
+        this.distTable = new HashMap<StringPair, Double>();
+        if (this.distFile != null) {
+            log.info("Loading distances from {}.", this.distFile);
+            try (TabbedLineReader distStream = new TabbedLineReader(this.distFile)) {
+                int id1ColIdx = distStream.findField("id1");
+                int id2ColIdx = distStream.findField("id2");
+                int distColIdx = distStream.findField(this.distCol);
+                for (var line : distStream) {
+                    String g1 = line.get(id1ColIdx);
+                    String g2 = line.get(id2ColIdx);
+                    double dist = line.getDouble(distColIdx);
+                    StringPair gPair = new StringPair(g1, g2);
+                    this.distTable.put(gPair, dist);
+                }
+                log.info("{} distances stored.", this.distTable.size());
+            }
+        }
+
     }
 
     @Override
@@ -164,6 +200,12 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     @Override
     public SampleDescriptor getDescriptor(String sampleId) {
         return this.sampMap.get(sampleId);
+    }
+
+    @Override
+    public double getDistance(String genome1, String genome2) {
+        StringPair gPair = new StringPair(genome1, genome2);
+        return this.distTable.getOrDefault(gPair, Double.NaN);
     }
 
 }

@@ -36,6 +36,8 @@ public class RatingSampReportEvalReporter extends BaseSampleSampReportEvalReport
         private boolean correctRepGen;
         /** number of bad hits */
         private double badCount;
+        /** total number of hits */
+        private double hitCount;
 
         /**
          * Construct a new best-report object from the report data for a sample.
@@ -43,14 +45,16 @@ public class RatingSampReportEvalReporter extends BaseSampleSampReportEvalReport
          * @param name		name of report
          * @param badPct	percent of hits that were bad
          * @param badCount	number of hits that were bad
+         * @param hitCount	total number of hits
          * @param expected	expected repgen ID
          * @param best		actual repgen ID
          */
-        protected BestReport(String name, double badPct, double badCount, String expected, String best) {
+        protected BestReport(String name, double badPct, double badCount, double hitCount, String expected, String best) {
             this.reportName = name;
             this.badPercent = badPct;
             this.badCount = badCount;
             this.correctRepGen = expected.equals(best);
+            this.hitCount = hitCount;
         }
 
         @Override
@@ -95,6 +99,12 @@ public class RatingSampReportEvalReporter extends BaseSampleSampReportEvalReport
             return this.badCount;
         }
 
+        /**
+         * @return the total number of hits
+         */
+        public double getHitCount() {
+            return this.hitCount;
+        }
     }
 
     /**
@@ -117,7 +127,7 @@ public class RatingSampReportEvalReporter extends BaseSampleSampReportEvalReport
         if (badCount > 0)
             badPercent = badCount * 100.0 / (badCount + expectedCount);
         // Compute the best-report tracker.
-        BestReport reportData = new BestReport(name, badPercent, badCount, desc.getRepId(), best);
+        BestReport reportData = new BestReport(name, badPercent, badCount, badCount + expectedCount, desc.getRepId(), best);
         // Compare it to the existing value.  Store it if it is better than the old value.
         String sampleId = desc.getSampleId();
         BestReport oldData = this.bestMap.get(sampleId);
@@ -132,13 +142,13 @@ public class RatingSampReportEvalReporter extends BaseSampleSampReportEvalReport
     @Override
     public void closeReport() {
         // All done, so write the results.  We start with the header.
-        writer.println("sample_id\tbest_report\tbad_hits\tbad_percent\tcorrect_repgen");
+        writer.println("sample_id\tbest_report\thit_count\tbad_hits\tbad_percent\tcorrect_repgen");
         // Now, loop through the best-report map.
         for (var sampEntry : this.bestMap.entrySet()) {
             String sampleId = sampEntry.getKey();
             BestReport reportData = sampEntry.getValue();
-            writer.println(sampleId + "\t" + reportData.getReportName() + "\t" + reportData.getBadCount() + "\t" + reportData.getBadPercent()
-                    + "\t" + (reportData.isCorrectRepGen() ? "Y" : ""));
+            writer.println(sampleId + "\t" + reportData.getReportName() + "\t" + reportData.getHitCount() + "\t" +  reportData.getBadCount()
+                    + "\t" + reportData.getBadPercent() + "\t" + (reportData.isCorrectRepGen() ? "Y" : ""));
         }
     }
 }
