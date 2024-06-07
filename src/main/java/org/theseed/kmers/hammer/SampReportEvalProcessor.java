@@ -91,7 +91,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     @Option(name = "--distCol", metaVar = "ANI", usage = "index (1-based) or name of distance column in distance file")
     private String distCol;
 
-    /** list of input sample bin reports */
+   /** list of input sample bin reports */
     @Argument(index = 0, metaVar = "reportFile1 reportFile2 ...", usage = "files containing sample bin reports to evaluate")
     private List<File> reportFiles;
 
@@ -150,7 +150,6 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                 log.info("{} distances stored.", this.distTable.size());
             }
         }
-
     }
 
     @Override
