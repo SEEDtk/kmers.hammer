@@ -76,6 +76,13 @@ public abstract class HammerReport {
             public HammerReport create(IParms processor) throws ParseFailureException, IOException {
                 return new ValidationHammerReport(processor);
             }
+        },
+        /** summary report of the hammer counts per genome */
+        SUMMARY {
+            @Override
+            public HammerReport create(IParms processor) throws ParseFailureException, IOException {
+                return new SummmaryHammerReport(processor);
+            }
         }
         ;
 
@@ -152,7 +159,7 @@ public abstract class HammerReport {
      * @param repName		representative genome name
      * @param hammerMap		map of hammers to source descriptors for each hammer generated from the genome
      */
-    public abstract void processGenome(String repId, String value, Map<String, Source> hammerMap);
+    public abstract void processGenome(String repId, String repName, Map<String, Source> hammerMap);
 
     /**
      * Summarize and complete the report.

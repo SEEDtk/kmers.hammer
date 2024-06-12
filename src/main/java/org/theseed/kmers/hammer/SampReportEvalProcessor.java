@@ -84,7 +84,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     private SampReportEvalReporter.Type reportType;
 
     /** distance file to use for distance-based reports */
-    @Option(name = "--distFile", metaVar = "genomes.dists.tbl", usage = "name of an optional file containing genome distances")
+    @Option(name = "--distFile", aliases = { "--dists" }, metaVar = "genomes.dists.tbl", usage = "name of an optional file containing genome distances")
     private File distFile;
 
     /** column containing the distances in the distance file */
@@ -120,6 +120,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
         this.repCol = "rep_id";
         this.reportFiles = new ArrayList<File>();
         this.reportType = SampReportEvalReporter.Type.QUALITY;
+        this.distCol = "0";
     }
 
     @Override
