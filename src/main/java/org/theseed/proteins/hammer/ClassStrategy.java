@@ -25,6 +25,8 @@ public abstract class ClassStrategy {
     protected static Logger log = LoggerFactory.getLogger(ClassStrategy.class);
     /** TRUE if the counts should be scaled, else FALSE */
     private boolean scaled;
+    /** counting method to use */
+    private HammerDb.Method method;
     /** scale factor for weighting, based on the typical read length */
     protected static final double SCALE_FACTOR = 180.0;
 
@@ -86,6 +88,7 @@ public abstract class ClassStrategy {
      */
     public ClassStrategy(IParms processor) {
         this.scaled = processor.isScaled();
+        this.method = processor.getMethod();
     }
 
     /**
@@ -107,6 +110,15 @@ public abstract class ClassStrategy {
      */
     public double getWeight(int len, double covg) {
         return (this.scaled ? len * covg / SCALE_FACTOR : 1.0);
+    }
+
+    /**
+     * @return the weight of a hit according to the current method
+     *
+     * @param hit	hit to use
+     */
+    public double getWeight(HammerDb.Hit hit) {
+        return this.method.getWeight(hit);
     }
 
 }
