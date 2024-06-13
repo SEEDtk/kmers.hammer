@@ -52,14 +52,15 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  *  -t	type of sample group (default FASTQ)
  *
  *  --hType		type of hammer database (default MEMORY)
+ *  --method	voting method to use (default COUNT)
  *  --strategy	scoring strategy to use (default HITS)
  *  --file		file containing hammer database (either SQLite database or hammer flat file)
  *  --url		URL of database (host and name, MySQL only)
  *  --parms 	database connection parameter string (MySQL only)
  *  --type		database engine type (default MEMORY)
  *  --para 		use parallel processing
- *  --min 		minimum score for an acceptable genome hit (default 0.8)
- *  --qual 		minimum quality for an acceptable sequence hit (default 0.8)
+ *  --min 		minimum score for an acceptable genome hit (default 10.0)
+ *  --qual 		minimum quality for an acceptable sequence hit (default 0.7)
  *  --seqBatch 	maximum number of kilobases to process at one time (default 1000)
  *  --diff 		minimum number of additional hits for a region-based classification
  *  --resume 	name of an existing report file containing data from samples already run
@@ -131,7 +132,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Option(name = "--qual", metaVar = "0.9", usage = "minimum acceptable sequence quality (0 to 99)")
     private double minQual;
 
-    /** maximum number of kilobases */
+    /** maximum number of kilobases per batch */
     @Option(name = "--seqBatch", metaVar = "2000", usage = "maximum number of kilobases to process in a batch")
     private int seqBatchSize;
 
@@ -176,7 +177,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.paraFlag = false;
         this.groupType = FastqSampleGroup.Type.FASTQ;
         this.minScore = 10.0;
-        this.minQual = 0.8;
+        this.minQual = 0.7;
         this.seqBatchSize = 1000;
         this.strategyType = ClassStrategy.Type.HITS;
         this.minDiff = 2;
