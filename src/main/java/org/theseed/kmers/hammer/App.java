@@ -18,7 +18,6 @@ import org.theseed.basic.BaseProcessor;
  *  readTest		test a FASTQ sample and output unexpected hammer hits
  *  scanTest		analyze the results of a synthetic hammer test
  *  scanLocs		compare features hit by bad hammer matches in a synthetic test
- *  distTest		compute the ANI distances to the expected and actual choices in a synthetic test
  *  testStats		produce statistics for each test/match genome pair in a contig test
  *  sampReport		produce a bin report for a sample group using hammers
  *  gtoReport		count hammer hits in the genomes of a genome source
@@ -33,6 +32,7 @@ import org.theseed.basic.BaseProcessor;
  *  sourMap			create a map between hammer fids and SOUR role IDs
  *  hCompare		compare two hammer databases
  *  sampEval		evaluate the results of different sampReport tests
+ *  roleWeights		modify a hammer load file to scale the weights per role
  */
 public class App
 {
@@ -76,9 +76,6 @@ public class App
         case "scanLocs" :
             processor = new ContigTestLocationProcessor();
             break;
-        case "distTest" :
-            processor = new ContigTestDistanceProcessor();
-            break;
         case "testStats" :
             processor = new ContigTestStatisticsProcessor();
             break;
@@ -120,6 +117,9 @@ public class App
             break;
         case "sampEval" :
             processor = new SampReportEvalProcessor();
+            break;
+        case "roleWeights" :
+            processor = new RoleWeightProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

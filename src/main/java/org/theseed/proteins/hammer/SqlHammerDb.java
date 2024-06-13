@@ -110,9 +110,10 @@ public class SqlHammerDb extends HammerDb {
         }
 
         @Override
-        public void updateHammerMap(String fid, String hammer, double str) {
+        public void updateHammerMap(String fid, String roleId, String hammer, double str) {
             try {
                 this.loader.set("hammer", hammer);
+                this.loader.set("role", roleId);
                 this.loader.set("fid", fid);
                 this.loader.set("strength", str);
                 this.loader.insert();
@@ -204,7 +205,7 @@ public class SqlHammerDb extends HammerDb {
      */
     protected DbQuery buildBatchQuery(int size) throws SQLException {
         DbQuery retVal = new DbQuery(this.db, "Hammer");
-        retVal.select("Hammer", "fid", "hammer", "strength");
+        retVal.select("Hammer", "fid", "hammer", "strength", "role");
         retVal.in("Hammer.hammer", size);
         return retVal;
     }
@@ -238,7 +239,7 @@ public class SqlHammerDb extends HammerDb {
         int count = 0;
         for (DbRecord result : query) {
             HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
-                    result.getDouble("Hammer.strength"));
+                    result.getString("Hammer.role"), result.getDouble("Hammer.strength"));
             String hammer = result.getString("Hammer.hammer");
             this.countHit(gCounts, source, kmers.getCount(hammer));
             count++;
@@ -425,7 +426,8 @@ public class SqlHammerDb extends HammerDb {
             // Loop through the results, adding them to the return hash.
             for (DbRecord result : query) {
                 String hammer = result.getString("Hammer.hammer");
-                Source source = new Source(result.getString("Hammer.fid"), result.getDouble("Hammer.strength"));
+                Source source = new Source(result.getString("Hammer.fid"), result.getString("Hammer.role"),
+                        result.getDouble("Hammer.strength"));
                 retVal.put(hammer, source);
             }
         } catch (SQLException e) {

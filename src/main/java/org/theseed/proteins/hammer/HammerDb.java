@@ -117,10 +117,11 @@ public abstract class HammerDb {
          * Forge a connection between a hammer and a genome.
          *
          * @param fid		feature ID of the universal protein in the target genome
-         * @param hammer	hammer that identifies it
+         * @param roleId	role ID of the universal protein
+         * @param hammer	hammer that identifies the feature
          * @param str		strength of the hammer
          */
-        public void updateHammerMap(String fid, String hammer, double str) throws SQLException, IOException;
+        public void updateHammerMap(String fid, String roleId, String hammer, double str) throws SQLException, IOException;
 
         /**
          * Create an empty hammer map.
@@ -139,8 +140,10 @@ public abstract class HammerDb {
      */
     public static class Source implements ISource {
 
-        /** source feature for the hammer */
+        /** source feature ID for the hammer */
         private String fid;
+        /** source role ID for the hammer */
+        private String roleId;
         /** strength of the hammer, a ranking from 0 to 1 */
         private double strength;
 
@@ -148,10 +151,12 @@ public abstract class HammerDb {
          * Construct a new hammer source descriptor.
          *
          * @param fid		source feature ID
+         * @param roleId	role ID for the feature
          * @param str		strength of the hammer
          */
-        public Source(String fid, double str) {
+        public Source(String fid, String roleId, double str) {
             this.fid = fid;
+            this.roleId = roleId;
             this.strength = str;
         }
 
@@ -174,6 +179,13 @@ public abstract class HammerDb {
          */
         public String getGenomeId() {
             return Feature.genomeOf(this.fid);
+        }
+
+        /**
+         * @return the ID of the hammer's source role
+         */
+        public String getRole() {
+            return this.roleId;
         }
 
     }
@@ -416,8 +428,9 @@ public abstract class HammerDb {
                         }
                     }
                     double strength = line.getDouble(2);
+                    String role = line.get(6);
                     // Add this hammer to the map.
-                    loader.updateHammerMap(fid, hammer, strength);
+                    loader.updateHammerMap(fid, role, hammer, strength);
                     hCount++;
                     // The loads operate at very different speeds.  We update the log once per 5 seconds.
                     if (log.isInfoEnabled() && System.currentTimeMillis() - logPoint >= 5000) {

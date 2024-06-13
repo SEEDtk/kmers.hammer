@@ -88,9 +88,9 @@ public class HashHammerDb extends HammerDb {
         }
 
         @Override
-        public void updateHammerMap(String fid, String hammer, double str) {
+        public void updateHammerMap(String fid, String roleId, String hammer, double str) {
             // Add the hammer to the main map.
-            Source node = new Source(fid, str);
+            Source node = new Source(fid, roleId, str);
             HashHammerDb.this.hammerMap.put(hammer, node);
             // Add the hammer to the genome's hammer array.
             HammerArray gHammers = HashHammerDb.this.genomeMap.computeIfAbsent(node.getGenomeId(),
