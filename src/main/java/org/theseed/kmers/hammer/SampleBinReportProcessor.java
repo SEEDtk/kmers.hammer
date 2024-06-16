@@ -237,7 +237,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.goodScores = 0;
         this.badSamples = new TreeSet<String>();
         // Write the report header.
-        writer.println("sample_id\trepgen_id\trepgen_name\tcount");
+        writer.println("sample_id\trepgen_id\trepgen_name\tcount\troles");
         // Start by connecting to the sample group.
         try (FastqSampleGroup sampleGroup = this.groupType.create(this.inDir)) {
             Set<String> samples = sampleGroup.getSampleIDs();
@@ -504,7 +504,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 this.goodScores++;
                 String genomeId = score.getKey();
                 String genomeName = this.genomeMap.getOrDefault(genomeId, "<unknown>");
-                writer.println(sampleId + "\t" + genomeId + "\t" + genomeName + "\t" + score.getCount());
+                writer.println(sampleId + "\t" + genomeId + "\t" + genomeName + "\t" + score.getCount()
+                        + "\t" + score.getRoleCount());
             }
         }
         // Try to keep the output aligned on sample boundaries so we can restart.

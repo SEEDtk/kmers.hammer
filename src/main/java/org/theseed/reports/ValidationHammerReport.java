@@ -13,8 +13,8 @@ import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Genome;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.proteins.hammer.HammerDb.Source;
+import org.theseed.proteins.hammer.ScoreMap;
 import org.theseed.sequence.Sequence;
-import org.theseed.stats.WeightMap;
 
 /**
  * This report scans all the hammers in a representative genome and insures they belong to its subset of the
@@ -65,9 +65,9 @@ public class ValidationHammerReport extends HammerReport {
         int found = (int) hammerMap.keySet().stream().filter(x -> hammerSet.contains(x)).count();
         int alien = hammerSet.size() - found;
         // Now score the genome.
-        WeightMap scoreMap = hammers.findClosest(contigs);
+        ScoreMap scoreMap = hammers.findClosest(contigs);
         // Show the top-scoring genome.
-        WeightMap.Count best = scoreMap.getBestEntry();
+        ScoreMap.Count best = scoreMap.getBestEntry();
         // Compute the mean and the max of the others.
         double maxWeight = 0.0;
         double totalWeight = 0.0;

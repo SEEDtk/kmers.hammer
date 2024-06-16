@@ -25,7 +25,6 @@ import org.theseed.java.erdb.SqlBuffer;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
-import org.theseed.stats.WeightMap;
 
 /**
  * This is a hammer database stored in an SQL database.  It is slower than the in-memory
@@ -151,7 +150,7 @@ public class SqlHammerDb extends HammerDb {
     }
 
     @Override
-    protected void findClosestInternal(WeightMap map, Collection<Sequence> seqs, int kSize) {
+    protected void findClosestInternal(ScoreMap map, Collection<Sequence> seqs, int kSize) {
         // For performance reason, we batch the kmer queries.  We will collect a batch of
         // kmers, ask for the feature IDs, and count the results.  This gets repeated
         // until we reach the end.
@@ -230,18 +229,18 @@ public class SqlHammerDb extends HammerDb {
      * @param query		query to fill with parameters and run
      * @param kmers		parameter values to store in the query, indicating the kmers to run, mapped
      * 					to the number of hits for each
-     * @param gCounts	score map for recording results
+     * @param map		score map for recording results
      *
      * @throws SQLException
      */
-    private void runCountQuery(DbQuery query, CountMap<String> kmers, WeightMap gCounts) throws SQLException {
+    private void runCountQuery(DbQuery query, CountMap<String> kmers, ScoreMap map) throws SQLException {
         this.setupBatchQuery(query, kmers.keys());
         int count = 0;
         for (DbRecord result : query) {
             HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
                     result.getString("Hammer.role"), result.getDouble("Hammer.strength"));
             String hammer = result.getString("Hammer.hammer");
-            this.countHit(gCounts, source, kmers.getCount(hammer));
+            this.countHit(map, source, kmers.getCount(hammer));
             count++;
         }
         log.debug("{} kmers queried and {} results found.", kmers.size(), count);

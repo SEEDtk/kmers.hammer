@@ -16,9 +16,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.proteins.hammer.HammerDb;
+import org.theseed.proteins.hammer.ScoreMap;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.SequenceDirectory;
-import org.theseed.stats.WeightMap;
 import org.theseed.utils.BaseHammerUsageProcessor;
 
 /**
@@ -136,7 +136,7 @@ public class FindClosestProcessor extends BaseHammerUsageProcessor {
         log.info("Processing {}: {}.", member.getId(), member.getName());
         Collection<Sequence> seqs = member.getSequences();
         long memberTimer = System.nanoTime();
-        WeightMap closeMap = this.hammers.findClosest(seqs);
+        ScoreMap closeMap = this.hammers.findClosest(seqs);
         memberTimer = System.nanoTime() - memberTimer;
         // We will build our output line in here.
         StringBuffer buffer = new StringBuffer(200);
@@ -146,7 +146,7 @@ public class FindClosestProcessor extends BaseHammerUsageProcessor {
         if (closestList.size() > 2)
             closestList = closestList.subList(0, 2);
         // Display the closest genomes found.
-        for (WeightMap.Count counter : closestList)
+        for (ScoreMap.Count counter : closestList)
             buffer.append("\t").append(counter.getKey()).append("\t").append(counter.getCount());
         if (closestList.size() < 2) {
             // Here we have a failure condition.

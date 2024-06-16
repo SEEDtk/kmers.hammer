@@ -22,8 +22,8 @@ import org.theseed.genome.Genome;
 import org.theseed.genome.iterator.GenomeSource;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.proteins.hammer.HammerDb;
+import org.theseed.proteins.hammer.ScoreMap;
 import org.theseed.sequence.Sequence;
-import org.theseed.stats.WeightMap;
 import org.theseed.utils.BaseHammerUsageProcessor;
 
 /**
@@ -113,7 +113,7 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
     @Override
     protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
         // Write the report header.
-        writer.println("genome_id\tgenome_name\trep_id\trep_name\tscore");
+        writer.println("genome_id\tgenome_name\trep_id\trep_name\tscore\troles");
         // Get all the genome IDs for this source and build a stream.
         var genomeIDs = this.genomes.getIDs();
         Stream<String> genomeStream = this.makePara(genomeIDs.stream(), this.paraFlag);
@@ -137,7 +137,7 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
         Collection<Sequence> contigs = genome.getContigs().stream().map(x -> new Sequence(x.getId(), "", x.getSequence()))
                 .collect(Collectors.toList());
         // Compute the scores.
-        WeightMap scoreMap = hammerDb.findClosest(contigs);
+        ScoreMap scoreMap = hammerDb.findClosest(contigs);
         // Write the results.
         this.writeResults(writer, genome, scoreMap);
     }
@@ -149,12 +149,12 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
      * @param genome		genome being scored
      * @param scoreMap		repgen scores from the hammers
      */
-    private synchronized void writeResults(PrintWriter writer, Genome genome, WeightMap scoreMap) {
+    private synchronized void writeResults(PrintWriter writer, Genome genome, ScoreMap scoreMap) {
         // Get the genome ID and name.
         String prefix = genome.getId() + "\t" + genome.getName();
         // Loop through the scores.
         int found = 0;
-        List<WeightMap.Count> scores = scoreMap.sortedCounts();
+        List<ScoreMap.Count> scores = scoreMap.sortedCounts();
         for (var score : scores) {
             if (score.getCount() >= this.minScore) {
                 writeCount(writer, prefix, score);
@@ -167,7 +167,7 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
                 this.writeCount(writer, prefix, scores.get(0));
             else {
                 // Nothing hit.  Show a blank line.
-                writer.println(prefix + "\t\t\t");
+                writer.println(prefix + "\t\t\t\t");
             }
         }
         writer.flush();
@@ -180,10 +180,11 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
      * @param prefix		prefix for the output line
      * @param score			score to output
      */
-    private void writeCount(PrintWriter writer, String prefix, WeightMap.Count score) {
+    private void writeCount(PrintWriter writer, String prefix, ScoreMap.Count score) {
         String repId = score.getKey();
         String repName = this.repGenMap.get(repId);
-        writer.println(prefix + "\t" + repId + "\t" + repName + "\t" + Double.toString(score.getCount()));
+        writer.println(prefix + "\t" + repId + "\t" + repName + "\t" + Double.toString(score.getCount())
+                + "\t" + Integer.toString(score.getRoleCount()));
     }
 
 }

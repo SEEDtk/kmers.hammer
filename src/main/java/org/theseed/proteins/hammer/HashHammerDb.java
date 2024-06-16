@@ -14,7 +14,6 @@ import org.theseed.basic.ParseFailureException;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
 import org.theseed.sequence.Sequence;
-import org.theseed.stats.WeightMap;
 
 /**
  * This object implements a thor-hammer database using an in-memory hash.  It is much more memory-intensive
@@ -107,7 +106,7 @@ public class HashHammerDb extends HammerDb {
     }
 
    @Override
-    protected void findClosestInternal(WeightMap map, Collection<Sequence> seqs, final int kSize) {
+    protected void findClosestInternal(ScoreMap map, Collection<Sequence> seqs, final int kSize) {
         Iterable<String> kIter = KmerSeries.init(seqs, kSize);
         for (String kmer : kIter) {
             HammerDb.Source source = this.getSource(kmer);

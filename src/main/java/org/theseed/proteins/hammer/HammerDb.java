@@ -30,7 +30,6 @@ import org.theseed.locations.Location;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.fastq.SeqRead;
-import org.theseed.stats.WeightMap;
 
 /**
  * This object represents a thor-hammer database.  Such databases are huge and take up a great deal of
@@ -499,8 +498,8 @@ public abstract class HammerDb {
      *
      * @return a weight map detailing the hit score for each genome
      */
-    public WeightMap findClosest(Collection<Sequence> seqs) {
-        var retVal = new WeightMap();
+    public ScoreMap findClosest(Collection<Sequence> seqs) {
+        var retVal = new ScoreMap();
         // Get the reverse complements.
         List<Sequence> seqList = reverseAll(seqs);
         // Add the original sequences.
@@ -570,12 +569,12 @@ public abstract class HammerDb {
     /**
      * Count a hit in a result map.
      *
-     * @param weightMap		weight map containing the hit score for each genome
+     * @param scoreMap		weight map containing the hit score for each genome
      * @param hitSource		hit to count
      * @param count			number of times to count the hit
      */
-    protected void countHit(WeightMap weightMap, Source hitSource, int count) {
-        weightMap.count(hitSource.getGenomeId(), this.countMethod.getWeight(hitSource) * count);
+    protected void countHit(ScoreMap scoreMap, Source hitSource, int count) {
+        scoreMap.count(hitSource.getGenomeId(), this.countMethod.getWeight(hitSource) * count, hitSource.getRole());
     }
 
     /**
@@ -600,7 +599,7 @@ public abstract class HammerDb {
      *
      * @return a count map detailing the number of hits for each genome
      */
-    protected abstract void findClosestInternal(WeightMap map, Collection<Sequence> seqs, int kSize);
+    protected abstract void findClosestInternal(ScoreMap map, Collection<Sequence> seqs, int kSize);
 
     /**
      * @return the name of the hammer load file, or NULL if it is not available

@@ -31,7 +31,6 @@ import org.theseed.locations.Location;
 import org.theseed.sequence.FastaInputStream;
 import org.theseed.sequence.Sequence;
 import org.theseed.sequence.fastq.SeqRead;
-import org.theseed.stats.WeightMap;
 
 /**
  * @author Bruce Parrello
@@ -103,9 +102,9 @@ class HammerDbTest {
             for (Sequence seq : seqsIn)
                 seqs.add(seq);
         }
-        WeightMap counts = hammers.findClosest(seqs);
+        ScoreMap counts = hammers.findClosest(seqs);
         assertThat(counts.size(), equalTo(3));
-        List<WeightMap.Count> results = counts.sortedCounts();
+        List<ScoreMap.Count> results = counts.sortedCounts();
         assertThat(results.get(0).getKey(), equalTo("565575.4"));
         assertThat(results.get(1).getKey(), equalTo("1397.4"));
         assertThat(results.get(2).getKey(), equalTo("1278308.3"));
