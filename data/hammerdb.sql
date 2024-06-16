@@ -1,7 +1,8 @@
 CREATE TABLE Hammer (
     hammer VARCHAR(20) PRIMARY KEY,
     fid VARCHAR(30) NOT NULL,
-    strength DOUBLE NOT NULL
+    strength DOUBLE NOT NULL,
+    roleId VARCHAR(30) NOT NULL
     );
     CREATE INDEX idxFid ON Hammer (fid);
     INSERT INTO _diagram (table_name, rloc, cloc, description) VALUES ('Hammer', 1, 1,

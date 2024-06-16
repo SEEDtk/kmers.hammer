@@ -112,7 +112,7 @@ public class SqlHammerDb extends HammerDb {
         public void updateHammerMap(String fid, String roleId, String hammer, double str) {
             try {
                 this.loader.set("hammer", hammer);
-                this.loader.set("role", roleId);
+                this.loader.set("roleId", roleId);
                 this.loader.set("fid", fid);
                 this.loader.set("strength", str);
                 this.loader.insert();
@@ -204,7 +204,7 @@ public class SqlHammerDb extends HammerDb {
      */
     protected DbQuery buildBatchQuery(int size) throws SQLException {
         DbQuery retVal = new DbQuery(this.db, "Hammer");
-        retVal.select("Hammer", "fid", "hammer", "strength", "role");
+        retVal.select("Hammer", "fid", "hammer", "strength", "roleId");
         retVal.in("Hammer.hammer", size);
         return retVal;
     }
@@ -238,7 +238,7 @@ public class SqlHammerDb extends HammerDb {
         int count = 0;
         for (DbRecord result : query) {
             HammerDb.Source source = new HammerDb.Source(result.getString("Hammer.fid"),
-                    result.getString("Hammer.role"), result.getDouble("Hammer.strength"));
+                    result.getString("Hammer.roleId"), result.getDouble("Hammer.strength"));
             String hammer = result.getString("Hammer.hammer");
             this.countHit(map, source, kmers.getCount(hammer));
             count++;
@@ -332,7 +332,7 @@ public class SqlHammerDb extends HammerDb {
         for (DbRecord result : query) {
             String fid = result.getString("Hammer.fid");
             double strength = result.getDouble("Hammer.strength");
-            String role = result.getString("Hammer.role");
+            String role = result.getString("Hammer.roleId");
             // Now we get the hits, update the fids, and add the hits to the output.
             List<HammerDb.Hit> hitList = batchMap.get(result.getString("Hammer.hammer"));
             hitList.stream().forEach(x -> x.setHammerSource(fid, role, strength));
@@ -420,13 +420,13 @@ public class SqlHammerDb extends HammerDb {
         Map<String, Source> retVal = new HashMap<String, Source>();
         // Create a query to look for all hammers with a matching feature ID.
         try (DbQuery query = new DbQuery(this.db, "Hammer")) {
-            query.select("Hammer", "fid", "role", "hammer", "strength");
+            query.select("Hammer", "fid", "roleId", "hammer", "strength");
             query.rel("Hammer.fid", Relop.LIKE);
             query.setParm(1, "fig|" + genomeId + ".%");
             // Loop through the results, adding them to the return hash.
             for (DbRecord result : query) {
                 String hammer = result.getString("Hammer.hammer");
-                Source source = new Source(result.getString("Hammer.fid"), result.getString("Hammer.role"),
+                Source source = new Source(result.getString("Hammer.fid"), result.getString("Hammer.roleId"),
                         result.getDouble("Hammer.strength"));
                 retVal.put(hammer, source);
             }
