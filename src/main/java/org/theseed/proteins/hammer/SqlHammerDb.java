@@ -266,7 +266,7 @@ public class SqlHammerDb extends HammerDb {
     @Override
     protected void findHitsInternal(Collection<Hit> collection, Collection<? extends ISequence> seqs, int kSize, boolean dir) {
         // Again, we batch the queries for performance.  A batch consists of a map from each kmer to a list of hits
-        // with dummy fids. The output collection will retain the hits that are found.
+        // with dummy fids and roles. The output collection will retain the hits that are found.
         try {
             // Set up a map to hold the batches.
             Map<String, List<HammerDb.Hit>> batchMap = new HashMap<String, List<HammerDb.Hit>>(this.hashSize);
@@ -289,7 +289,7 @@ public class SqlHammerDb extends HammerDb {
                             batchMap.clear();
                         }
                         // Save this kmer in the map.
-                        var hit = new HammerDb.Hit(seqId, len, i, dir, "", kSize, 1.0);
+                        var hit = new HammerDb.Hit(seqId, len, i, dir, "", "", kSize, 1.0);
                         List<HammerDb.Hit> hitList = batchMap.computeIfAbsent(dna.substring(i, i + kSize),
                                 x -> new ArrayList<HammerDb.Hit>(5));
                         hitList.add(hit);
@@ -333,9 +333,10 @@ public class SqlHammerDb extends HammerDb {
         for (DbRecord result : query) {
             String fid = result.getString("Hammer.fid");
             double strength = result.getDouble("Hammer.strength");
+            String role = result.getString("Hammer.role");
             // Now we get the hits, update the fids, and add the hits to the output.
             List<HammerDb.Hit> hitList = batchMap.get(result.getString("Hammer.hammer"));
-            hitList.stream().forEach(x -> x.setHammerSource(fid, strength));
+            hitList.stream().forEach(x -> x.setHammerSource(fid, role, strength));
             collection.addAll(hitList);
             count++;
         }
@@ -420,7 +421,7 @@ public class SqlHammerDb extends HammerDb {
         Map<String, Source> retVal = new HashMap<String, Source>();
         // Create a query to look for all hammers with a matching feature ID.
         try (DbQuery query = new DbQuery(this.db, "Hammer")) {
-            query.select("Hammer", "fid", "hammer", "strength");
+            query.select("Hammer", "fid", "role", "hammer", "strength");
             query.rel("Hammer.fid", Relop.LIKE);
             query.setParm(1, "fig|" + genomeId + ".%");
             // Loop through the results, adding them to the return hash.

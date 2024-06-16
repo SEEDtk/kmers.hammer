@@ -145,7 +145,7 @@ public class HashHammerDb extends HammerDb {
                 HammerDb.Source source = this.getSource(kmer);
                 if (source != null) {
                     // Here we have a hammer hit.  Form the hit descriptor.
-                    var hit = new HammerDb.Hit(contigId, len, i, dir, source.getFid(), kSize, source.getStrength());
+                    var hit = new HammerDb.Hit(contigId, len, i, dir, source.getFid(), source.getRole(), kSize, source.getStrength());
                     collection.add(hit);
                 }
             }

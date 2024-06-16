@@ -24,7 +24,7 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
     public SamplingSampReportEvalReporter(IParms processor, PrintWriter writer) {
         super(processor, writer);
         // Write the report header.
-        writer.println("report_name\tsample_id\tsample_genome\texpected_rep\texpected_name\texpected_hits\texpected_hit%\tbest_rep\tbest_name\tbest_hits\tbest_hit%\tbad_hits\tbad_hits%");
+        writer.println("report_name\tsample_id\tsample_genome\texpected_rep\texpected_name\texpected_hits\texpected_hit%\tbest_rep\tbest_name\tbest_hits\tbest_hit%\tbad_hits\tbad_hits%\tdistance");
     }
 
     @Override
@@ -50,11 +50,13 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
         // Get the data for the expected repgen.
         String expected = desc.getRepId();
         String expectedName = this.getRepName(expected);
+        // Get the distance to the expected repgen.
+        double distance = this.getDistance(sampleGenome, expected);
         // Finally, get the name of the best genome.
         String bestName = this.getRepName(best);
         // Write the sample data.
         writer.println(name + "\t" + sampleId + "\t" + sampleGenome + "\t" + expected + "\t" + expectedName + "\t" + expectedCount + "\t" + expectedPct
-                + "\t" + best + "\t" + bestName + "\t" + bestCount + "\t" + bestPct + "\t" + badCount + "\t" + badPct);
+                + "\t" + best + "\t" + bestName + "\t" + bestCount + "\t" + bestPct + "\t" + badCount + "\t" + badPct + "\t" + distance);
     }
 
     @Override

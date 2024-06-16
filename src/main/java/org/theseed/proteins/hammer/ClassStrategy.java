@@ -7,7 +7,6 @@ import java.util.Collection;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.theseed.stats.WeightMap;
 
 /**
  * This object implements a strategy for classifying samples using hammers.  The main engine takes as input
@@ -100,7 +99,7 @@ public abstract class ClassStrategy {
      *
      * @return a weight map containing the score for each represented group in the sequence
      */
-    public abstract WeightMap computeScores(Collection<HammerDb.Hit> hits, int len, double covg);
+    public abstract ScoreMap computeScores(Collection<HammerDb.Hit> hits, int len, double covg);
 
     /**
      * @return the weight to use for a specified length and coverage

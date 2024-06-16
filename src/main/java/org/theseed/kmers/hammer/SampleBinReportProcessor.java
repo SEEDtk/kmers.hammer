@@ -33,7 +33,7 @@ import org.theseed.sequence.fastq.FastqSampleGroup;
 import org.theseed.sequence.fastq.ReadStream;
 import org.theseed.sequence.fastq.SampleDescriptor;
 import org.theseed.sequence.fastq.SeqRead;
-import org.theseed.stats.WeightMap;
+import org.theseed.proteins.hammer.ScoreMap;
 import org.theseed.utils.BaseHammerUsageProcessor;
 
 /**
@@ -314,7 +314,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         var batch = new HashMap<String, SeqRead.Part>();
         double batchCoverage = 1.0;
         // Start with an empty weight map.
-        WeightMap results = new WeightMap(this.mapSize);
+        ScoreMap results = new ScoreMap(this.mapSize);
         // Get local versions of the counters.
         int mySeqsIn = 0;
         int myBatchCount = 0;
@@ -341,7 +341,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                         // Here we must process the current batch. Get the scores and
                         // add them in.
                         myBatchCount++;
-                        WeightMap scores = this.processBatch(batch, batchCoverage, stats);
+                        ScoreMap scores = this.processBatch(batch, batchCoverage, stats);
                         results.accumulate(scores);
                         // Set up for the new sequence.
                         batchCoverage = coverage;
@@ -363,7 +363,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             // Process the residual batch.
             if (batch.size() > 0) {
                 myBatchCount++;
-                WeightMap scores = this.processBatch(batch, batchCoverage, stats);
+                ScoreMap scores = this.processBatch(batch, batchCoverage, stats);
                 results.accumulate(scores);
             }
             // No errors, so the sample is good.
@@ -429,8 +429,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
      * @return a weight map containing the score for each genome in this batch's
      *         sequences
      */
-    private WeightMap processBatch(Map<String, SeqRead.Part> batch, double coverage, SampleStats stats) {
-        WeightMap retVal = new WeightMap(this.mapSize);
+    private ScoreMap processBatch(Map<String, SeqRead.Part> batch, double coverage, SampleStats stats) {
+        ScoreMap retVal = new ScoreMap(this.mapSize);
         // Get all the hits for the batch, sorted by location.
         SortedSet<HammerDb.Hit> hits = this.hammers.findHits(batch.values(), this.minQual);
         // Loop through the hits. For each sequence, we compute its scores and
@@ -474,9 +474,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
      * @param seqLen    length of the sequence
      * @param hitSet    set of hits against the sequence
      */
-    public void updateMap(double coverage, SampleStats stats, WeightMap masterMap, int seqLen,
+    public void updateMap(double coverage, SampleStats stats, ScoreMap masterMap, int seqLen,
             Collection<HammerDb.Hit> hitSet) {
-        WeightMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
+        ScoreMap batchMap = this.strategy.computeScores(hitSet, seqLen, coverage);
         if (batchMap.size() <= 0)
             stats.ambigCount++;
         else {
@@ -493,7 +493,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
      * @param sampleId ID of the sample being processed
      * @param results  scores for this sample
      */
-    private synchronized void writeSample(PrintWriter writer, String sampleId, WeightMap results) {
+    private synchronized void writeSample(PrintWriter writer, String sampleId, ScoreMap results) {
         log.info("Writing results for sample {}.", sampleId);
         var scores = results.sortedCounts();
         for (var score : scores) {

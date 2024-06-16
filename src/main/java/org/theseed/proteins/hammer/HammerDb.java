@@ -135,7 +135,7 @@ public abstract class HammerDb {
     }
 
     /**
-     * This object describes a hammer's source information.  It includes the source feature ID and the
+     * This object describes a hammer's source information.  It includes the source feature ID, role ID, and
      * strength.
      */
     public static class Source implements ISource {
@@ -191,14 +191,14 @@ public abstract class HammerDb {
     }
 
     /**
-     * This interface can be used for any object that contains a hammer's feature ID and strength.
+     * This interface can be used for any object that contains a hammer's role ID and strength.
      */
     public interface ISource {
 
         /**
-         * @return the hammer's feature ID
+         * @return the ID of the hammer's source role
          */
-        public String getFid();
+        public String getRole();
 
         /**
          * @return the hammer's hit strength
@@ -217,6 +217,8 @@ public abstract class HammerDb {
         private Location loc;
         /** feature ID of the hammer hit */
         private String fid;
+        /** role ID of the feature */
+        private String roleId;
         /** strength of the hammer */
         private double strength;
 
@@ -228,11 +230,12 @@ public abstract class HammerDb {
          * @param idx		0-based index of the kmer on the contig
          * @param dir		TRUE if the hit was on the plus strand, else FALSE
          * @param fid		ID of the feature from which the hammer was harvested
+         * @param role		ID of the feature's role
          * @param kSize		kmer size of the hammer
          * @param str		strength of the hammer
          *
          */
-        protected Hit(String contig, int len, int idx, boolean dir, String fid, int kSize, double str) {
+        protected Hit(String contig, int len, int idx, boolean dir, String fid, String role, int kSize, double str) {
             // We will save the start and end locations of the hit in here.
             int start;
             int end;
@@ -249,6 +252,7 @@ public abstract class HammerDb {
             this.loc = Location.create(contig, start, end);
             this.fid = fid;
             this.strength = str;
+            this.roleId = role;
         }
 
         /**
@@ -335,11 +339,18 @@ public abstract class HammerDb {
          * Update the source feature ID and strength.
          *
          * @param fid2		hammer source feature ID
+         * @param role2		hammer source role ID
          * @param strength2	strength ratio
          */
-        public void setHammerSource(String fid2, double strength2) {
+        public void setHammerSource(String fid2, String role2, double strength2) {
             this.fid = fid2;
+            this.roleId = role2;
             this.strength = strength2;
+        }
+
+        @Override
+        public String getRole() {
+            return this.roleId;
         }
 
     }
