@@ -128,8 +128,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Option(name = "--filter", metaVar = "2.0", usage = "number of expected errors at or beyond which a read is rejected")
     private double badBaseFilter;
 
-    /** minimum acceptable quality for an input sequence */
-    @Option(name = "--qual", metaVar = "0.9", usage = "minimum acceptable sequence quality (0 to 99)")
+    /** minimum acceptable quality for an sequence hit */
+    @Option(name = "--qual", metaVar = "0.9", usage = "minimum acceptable sequence hit quality (0 to 1)")
     private double minQual;
 
     /** maximum number of kilobases per batch */
