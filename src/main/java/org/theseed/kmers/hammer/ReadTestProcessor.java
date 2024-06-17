@@ -56,6 +56,8 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  * --parms		database connection parameter string (MySQL only)
  * --type		database engine type
  * --blacklist	blacklist file, containing genome IDs to skip in the detail report for each sample
+ * --qual 		minimum quality for an acceptable sequence hit (default 0.7)
+ * --filter		maximum number of expected bad base pairs for an acceptable read (default 1.0)
  * --para		run the samples in parallel
  *
  * @author Bruce Parrello
@@ -83,6 +85,14 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     @Option(name = "--para", usage = "if specified, parallel-processing will be used to improve performance")
     private boolean paraFlag;
 
+    /** maximum number of expected errors allowed in an acceptable read */
+    @Option(name = "--filter", metaVar = "2.0", usage = "number of expected errors at or beyond which a read is rejected")
+    private double badBaseFilter;
+
+    /** minimum acceptable quality for an input sequence */
+    @Option(name = "--qual", metaVar = "0.9", usage = "minimum acceptable sequence quality (0 to 99)")
+    private double minQual;
+
     /** input directory name */
     @Argument(index = 0, metaVar = "inDir", usage = "input directory containing FASTQ samples", required = true)
     private File inDir;
@@ -92,6 +102,8 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     protected void setHammerDefaults() {
         this.blackFile = null;
         this.paraFlag = false;
+        this.badBaseFilter = 1.0;
+        this.minQual = 0.7;
     }
 
     @Override
@@ -129,7 +141,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     @Override
     protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
         // Write the output header.
-        writer.println("sample_id\thammer_fid\tgenome_id\tread_id\tweight\tquality");
+        writer.println("sample_id\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole");
         this.outCount = 0;
         // Create the sample group.
         try (FastqSampleGroup samples = FastqSampleGroup.Type.FASTQ.create(this.inDir)) {
@@ -155,6 +167,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
             Map<String, SeqRead.Part> batch = new HashMap<String, SeqRead.Part>(this.hashSize);
             int readCount = 0;
             int batchCount = 0;
+            int rejectCount = 0;
             for (SeqRead read : readStream) {
                 readCount++;
                 if (batch.size() >= this.getBatchSize()) {
@@ -164,7 +177,11 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
                     this.processBatch(hammers, batch, sampleId, writer);
                     batch.clear();
                 }
-                batch.put(read.getLabel(), read.getSequence());
+                // Check the read for errors.
+                if (read.getExpectedErrors() >= this.badBaseFilter)
+                    rejectCount++;
+                else
+                    batch.put(read.getLabel(), read.getSequence());
             }
             // Process the residual.
             if (batch.size() > 0) {
@@ -172,7 +189,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
                 this.processBatch(hammers, batch, sampleId, writer);
                 batchCount++;
             }
-            log.info("{} reads and {} batches in sample {}.", readCount, batchCount, sampleId);
+            log.info("{} reads and {} batches in sample {}. {} rejected.", readCount, batchCount, sampleId, rejectCount);
         } catch (IOException e) {
             // Convert to untracked so we can use in streaming.
             throw new UncheckedIOException(e);
@@ -191,7 +208,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
         // Get the blacklist.
         Set<String> blacklist = this.blackListMap.getOrDefault(sampleId, Collections.emptySet());
         // Find all the hits for this batch.
-        Collection<HammerDb.Hit> hits = hammers.findHits(batch.values(), 0.0);
+        Collection<HammerDb.Hit> hits = hammers.findHits(batch.values(), this.minQual);
         for (HammerDb.Hit hit : hits) {
             // Check the genome ID to insure we want this hit.
             String genomeId = hit.getGenomeId();
@@ -207,7 +224,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
                 // Write the hit.
                 synchronized (writer) {
                     writer.println(sampleId + "\t" + hammerFid + "\t" + genomeId + "\t" + readId + "\t" + Double.toString(weight)
-                            + "\t" + Double.toString(qual));
+                            + "\t" + Double.toString(qual) + "\t" + hit.getRole());
                     this.outCount++;
                 }
             }
