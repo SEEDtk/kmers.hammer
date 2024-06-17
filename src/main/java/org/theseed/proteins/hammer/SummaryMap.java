@@ -9,19 +9,17 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
 /**
  *
- * This is a simple map used to score hammer hits.  The keys are representative genome IDs (strings)
- * and the value contains a weight (floating-point count) and a set of roles found.
+ * This is a slight variant of the score map that only stores the maximum role count.
  * *
  * @author Bruce Parrello
  *
  */
-public class ScoreMap {
+public class SummaryMap {
 
     /** underlying hash map */
     private HashMap<String, Count> map;
@@ -35,8 +33,8 @@ public class ScoreMap {
 
         /** representative genome ID */
         private String key;
-        /** set of roles found */
-        private Set<String> roles;
+        /** number of roles found */
+        private int roleCount;
         /** current count value */
         private double num;
 
@@ -48,7 +46,7 @@ public class ScoreMap {
         private Count(String key) {
             this.key = key;
             this.num = 0.0;
-            this.roles = new TreeSet<String>();
+            this.roleCount = 0;
         }
 
         /**
@@ -69,7 +67,7 @@ public class ScoreMap {
          * @return the number of roles found for this key
          */
         public int getRoleCount() {
-            return this.roles.size();
+            return this.roleCount;
         }
 
         /**
@@ -77,20 +75,10 @@ public class ScoreMap {
          *
          * @param other		other counter to add
          */
-        protected void merge(ScoreMap.Count other) {
+        protected void merge(SummaryMap.Count other) {
             this.num += other.num;
-            this.roles.addAll(other.roles);
-        }
-
-        /**
-         * Merge another count into this count with a scale factor
-         *
-         * @param scale		scale factor for the other count
-         * @param other		other counter to add
-         */
-        protected void merge(double scale, ScoreMap.Count other) {
-            this.num += scale * other.num;
-            this.roles.addAll(other.roles);
+            if (other.roleCount > this.roleCount)
+                this.roleCount = other.roleCount;
         }
 
         /**
@@ -99,7 +87,7 @@ public class ScoreMap {
          * In that case, we sort by the string representation.
          */
         @Override
-        public int compareTo(ScoreMap.Count o) {
+        public int compareTo(SummaryMap.Count o) {
             // Note we compare the counts in reverse.
             int retVal = Double.compare(o.num, this.num);
             if (retVal == 0) {
@@ -150,15 +138,8 @@ public class ScoreMap {
             return true;
         }
 
-        private ScoreMap getEnclosingInstance() {
-            return ScoreMap.this;
-        }
-
-        /**
-         * @return the set of roles in this counter
-         */
-        public Set<String> getRoles() {
-            return this.roles;
+        private SummaryMap getEnclosingInstance() {
+            return SummaryMap.this;
         }
 
     }
@@ -179,7 +160,7 @@ public class ScoreMap {
     /**
      * Create a blank weighted-counting map.
      */
-    public ScoreMap() {
+    public SummaryMap() {
         this.map = new HashMap<String, Count>();
     }
 
@@ -188,7 +169,7 @@ public class ScoreMap {
      *
      * @param capacity	number of keys expected
      */
-    public ScoreMap(int capacity) {
+    public SummaryMap(int capacity) {
         this.map = new HashMap<String, Count>(capacity * 4 / 3 + 1);
     }
 
@@ -212,7 +193,7 @@ public class ScoreMap {
     public void clear() {
         for (Count count : this.map.values()) {
             count.num = 0.0;
-            count.roles.clear();
+            count.roleCount = 0;
         }
     }
 
@@ -234,22 +215,6 @@ public class ScoreMap {
     public Count findCounter(String key) {
         return this.map.get(key);
     }
-
-    /** Increment the weighted count for a key and return the new result.
-    *
-    * @param key	key of interest
-    * @param num	number to add to the count
-    * @param role	role ID being counted
-    *
-    * @return the new count value.
-    *
-    *  */
-   public double count(String key, double num, String role) {
-       Count myCount = this.getCounter(key);
-       myCount.num += num;
-       myCount.roles.add(role);
-       return myCount.num;
-   }
 
     /**
      * @return	a sorted collection of all the keys in this object
@@ -303,52 +268,12 @@ public class ScoreMap {
      *
      * @param key		key whose count is to be set
      * @param newValue	value of the new weighted count
-     * @param roles		roles to put into the count
+     * @param roleCount number of roles to put into the count
      */
-    public void setCount(String key, double newValue, Set<String> roles) {
+    public void setCount(String key, double newValue, int roleCount) {
        Count myCount = this.getCounter(key);
        myCount.num = newValue;
-       myCount.roles = new TreeSet<String>(roles);
-    }
-
-    /**
-     * Accumulate all the weighted counts from a small map into this map.
-     *
-     * @param otherMap		other map whose counts are to be added
-     */
-    public void accumulate(ScoreMap otherMap) {
-        otherMap.map.values().stream().forEach(x -> this.merge(x));
-    }
-
-    /**
-     * Accumulate all the weighted counts from a small map into this map with a scale factor.
-     *
-     * @param otherMap		other map whose counts are to be added
-     * @param scale			scale factor by which to multiply the incoming counts
-     */
-    public void accumulate(ScoreMap otherMap, double scale) {
-        otherMap.map.values().stream().forEach(x -> this.merge(scale, x));
-    }
-
-    /**
-     * Merge another count into the corresponding counter of this object.
-     *
-     * @param other		other count to merge
-     */
-    protected void merge(Count other) {
-        Count myCount = this.getCounter(other.getKey());
-        myCount.merge(other);
-    }
-
-    /**
-     * Merge another count into the corresponding counter of this object with a scale factor
-     *
-     * @param scale		scale factor to apply to the other counter
-     * @param other		other count to merge
-     */
-    protected void merge(double scale, Count other) {
-        Count myCount = this.getCounter(other.getKey());
-        myCount.merge(scale, other);
+       myCount.roleCount = roleCount;
     }
 
     /**
@@ -376,6 +301,20 @@ public class ScoreMap {
         if (this.map.size() > 0)
             retVal = Collections.min(this.map.values());
         return retVal;
+    }
+
+    /**
+     * Add a new count value for the specified key.
+     *
+     * @param key			key for the count
+     * @param count			value to add
+     * @param roleCount		number of roles
+     */
+    public void count(String key, double count, int roleCount) {
+        Count myCount = this.getCounter(key);
+        myCount.num += count;
+        if (roleCount > myCount.roleCount)
+            myCount.roleCount = roleCount;
     }
 
 }

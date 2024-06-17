@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.SortedMap;
 
-import org.theseed.stats.WeightMap;
+import org.theseed.proteins.hammer.SummaryMap;
 
 /**
  * This reporter tabulates the good and bad hits for each sample and outputs a comparison of the various bin-reports.
@@ -37,7 +37,7 @@ public class QualitySampReportEvalReporter extends SummarySampReportEvalReporter
     }
 
     @Override
-    protected void summarizeFile(String reportName, SortedMap<String, WeightMap> countMap) throws IOException {
+    protected void summarizeFile(String reportName, SortedMap<String, SummaryMap> countMap) throws IOException {
         // Total up the data for this file.
         double totalGood = 0.0;
         double totalBad = 0.0;
@@ -48,7 +48,7 @@ public class QualitySampReportEvalReporter extends SummarySampReportEvalReporter
         // highest-weight repgen.  If it's the expected one for the sample, the sample is good.
         for (var sampEntry : countMap.entrySet()) {
             String sampleId = sampEntry.getKey();
-            WeightMap counters = sampEntry.getValue();
+            SummaryMap counters = sampEntry.getValue();
             // Get the expected repgen.
             SampleDescriptor desc = this.getSample(sampleId);
             if (desc == null)

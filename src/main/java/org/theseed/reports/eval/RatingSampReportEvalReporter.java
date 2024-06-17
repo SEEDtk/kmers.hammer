@@ -120,8 +120,8 @@ public class RatingSampReportEvalReporter extends BaseSampleSampReportEvalReport
     }
 
     @Override
-    protected void processSampleData(String name, SampleDescriptor desc, double expectedCount, String best,
-            double bestCount, double badCount) {
+    protected void processSampleData(String name, SampleDescriptor desc, double expectedCount, int expectedRoleCount, String best,
+            double bestCount, double badCount, int badRoleCount) {
         // Compute the bad-hit percentage.
         double badPercent = 0.0;
         if (badCount > 0)

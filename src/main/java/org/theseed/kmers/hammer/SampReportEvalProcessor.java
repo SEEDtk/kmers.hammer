@@ -187,7 +187,8 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                     String repId = line.get(1);
                     String repName = line.get(2);
                     double count = line.getDouble(3);
-                    this.reporter.recordHits(desc, repId, repName, count);
+                    int roleCount = line.getInt(4);
+                    this.reporter.recordHits(desc, repId, repName, count, roleCount);
                 }
                 // All done, finish the reporting for this sample.
                 this.reporter.closeFile();

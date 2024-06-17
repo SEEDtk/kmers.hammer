@@ -189,10 +189,11 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
      * @param repId		ID of the repgen hit
      * @param repName	name of the repgen hit
      * @param count		weighted hit count
+     * @param roleCount number of roles hit
      *
      * @throws IOException
      */
-    public abstract void recordHits(SampleDescriptor desc, String repId, String repName, double count) throws IOException;
+    public abstract void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount) throws IOException;
 
     /**
      * Finish processing a bin report.
