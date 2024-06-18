@@ -33,6 +33,7 @@ import org.theseed.basic.BaseProcessor;
  *  hCompare		compare two hammer databases
  *  sampEval		evaluate the results of different sampReport tests
  *  roleWeights		modify a hammer load file to scale the weights per role
+ *  hitStats		read multiple readTest files and produce statistics on the hits
  */
 public class App
 {
@@ -120,6 +121,9 @@ public class App
             break;
         case "roleWeights" :
             processor = new RoleWeightProcessor();
+            break;
+        case "hitStats" :
+            processor = new HitStatsProcessor();
             break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");

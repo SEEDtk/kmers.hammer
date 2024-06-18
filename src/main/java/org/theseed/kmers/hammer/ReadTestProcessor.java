@@ -75,6 +75,8 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     private int hashSize;
     /** output stream for blocklisted hits */
     private PrintWriter goodStream;
+    /** header line for output files */
+    private static final String HEADER_LINE = "sample_id\thammer\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole";
 
     // COMMAND-LINE OPTIONS
 
@@ -155,7 +157,9 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
         try {
             // Write the output header.
-            writer.println("sample_id\thammer\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole");
+            writer.println(HEADER_LINE);
+            if (this.goodStream != null)
+                this.goodStream.println(HEADER_LINE);
             // Create the sample group.
             try (FastqSampleGroup samples = FastqSampleGroup.Type.FASTQ.create(this.inDir)) {
                 log.info("{} samples found in {}.", samples.size());
