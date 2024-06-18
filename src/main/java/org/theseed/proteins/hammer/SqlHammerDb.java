@@ -288,8 +288,9 @@ public class SqlHammerDb extends HammerDb {
                             batchMap.clear();
                         }
                         // Save this kmer in the map.
-                        var hit = new HammerDb.Hit(seqId, len, i, dir, "", "", kSize, 1.0);
-                        List<HammerDb.Hit> hitList = batchMap.computeIfAbsent(dna.substring(i, i + kSize),
+                        String kmer = dna.substring(i, i + kSize);
+                        var hit = new HammerDb.Hit(kmer, seqId, len, i, dir, "", "", kSize, 1.0);
+                        List<HammerDb.Hit> hitList = batchMap.computeIfAbsent(kmer,
                                 x -> new ArrayList<HammerDb.Hit>(5));
                         hitList.add(hit);
                     }

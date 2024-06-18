@@ -141,7 +141,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     @Override
     protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
         // Write the output header.
-        writer.println("sample_id\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole");
+        writer.println("sample_id\thammer\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole");
         this.outCount = 0;
         // Create the sample group.
         try (FastqSampleGroup samples = FastqSampleGroup.Type.FASTQ.create(this.inDir)) {
@@ -218,13 +218,14 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
                 Location loc = hit.getLoc();
                 String readId = loc.getContigId();
                 double weight = hit.getStrength();
+                String hammer = hit.getHammer();
                 // Get the sequence hit.
                 SeqRead.Part hitPart = batch.get(readId);
                 double qual = SeqRead.qualChance(hitPart.getQual(), loc.getLeft() - 1, hammers.getKmerSize());
                 // Write the hit.
                 synchronized (writer) {
-                    writer.println(sampleId + "\t" + hammerFid + "\t" + genomeId + "\t" + readId + "\t" + Double.toString(weight)
-                            + "\t" + Double.toString(qual) + "\t" + hit.getRole());
+                    writer.println(sampleId + "\t" + hammer + "\t" + hammerFid + "\t" + genomeId + "\t" + readId + "\t"
+                            + Double.toString(weight) + "\t" + Double.toString(qual) + "\t" + hit.getRole());
                     this.outCount++;
                 }
             }

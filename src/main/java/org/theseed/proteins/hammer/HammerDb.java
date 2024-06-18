@@ -220,10 +220,13 @@ public abstract class HammerDb {
         private String roleId;
         /** strength of the hammer */
         private double strength;
+        /** hammer string */
+        private String hammer;
 
         /**
          * Construct a hit descriptor.
          *
+         * @param hammer	hammer string
          * @param contig	contig ID
          * @param len		contig len
          * @param idx		0-based index of the kmer on the contig
@@ -234,7 +237,7 @@ public abstract class HammerDb {
          * @param str		strength of the hammer
          *
          */
-        protected Hit(String contig, int len, int idx, boolean dir, String fid, String role, int kSize, double str) {
+        protected Hit(String hammer, String contig, int len, int idx, boolean dir, String fid, String role, int kSize, double str) {
             // We will save the start and end locations of the hit in here.
             int start;
             int end;
@@ -252,6 +255,7 @@ public abstract class HammerDb {
             this.fid = fid;
             this.strength = str;
             this.roleId = role;
+            this.hammer = hammer;
         }
 
         /**
@@ -350,6 +354,13 @@ public abstract class HammerDb {
         @Override
         public String getRole() {
             return this.roleId;
+        }
+
+        /**
+         * @return the hammer string
+         */
+        public String getHammer() {
+            return this.hammer;
         }
 
     }
