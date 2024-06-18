@@ -59,6 +59,7 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  * --qual 		minimum quality for an acceptable sequence hit (default 0.7)
  * --filter		maximum number of expected bad base pairs for an acceptable read (default 1.0)
  * --para		run the samples in parallel
+ * --good		if specified, an output file to contain the blacklisted hits
  *
  * @author Bruce Parrello
  *
@@ -72,8 +73,8 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     private Map<String, Set<String>> blackListMap;
     /** hash size for sequence batches */
     private int hashSize;
-    /** number of lines output */
-    private int outCount;
+    /** output stream for blocklisted hits */
+    private PrintWriter goodStream;
 
     // COMMAND-LINE OPTIONS
 
@@ -93,6 +94,10 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
     @Option(name = "--qual", metaVar = "0.9", usage = "minimum acceptable sequence hit quality (0 to 1)")
     private double minQual;
 
+    /** if specified, the name of an output file for the blacklisted hits */
+    @Option(name = "--good", metaVar = "expectedHits.tbl", usage = "optional output file for blacklisted (expected) hits")
+    private File goodFile;
+
     /** input directory name */
     @Argument(index = 0, metaVar = "inDir", usage = "input directory containing FASTQ samples", required = true)
     private File inDir;
@@ -104,6 +109,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
         this.paraFlag = false;
         this.badBaseFilter = 1.0;
         this.minQual = 0.7;
+        this.goodFile = null;
     }
 
     @Override
@@ -134,21 +140,32 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
                 log.info("{} blacklists read from file.", this.blackListMap.size());
             }
         }
+        // Set up the expected-hits output file.
+        if (this.goodFile == null)
+            this.goodStream = null;
+        else {
+            this.goodStream = new PrintWriter(this.goodFile);
+            log.info("Blacklisted hits will be written to {}.", this.goodFile);
+        }
         // Compute the hash size.
         this.hashSize = this.getBatchSize() * 4 / 3 + 1;
     }
 
     @Override
     protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
-        // Write the output header.
-        writer.println("sample_id\thammer\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole");
-        this.outCount = 0;
-        // Create the sample group.
-        try (FastqSampleGroup samples = FastqSampleGroup.Type.FASTQ.create(this.inDir)) {
-            log.info("{} samples found in {}.", samples.size());
-            samples.stream(this.paraFlag).forEach(x -> this.processSample(hammerDb, x, writer));
+        try {
+            // Write the output header.
+            writer.println("sample_id\thammer\thammer_fid\tgenome_id\tread_id\tweight\tquality\trole");
+            // Create the sample group.
+            try (FastqSampleGroup samples = FastqSampleGroup.Type.FASTQ.create(this.inDir)) {
+                log.info("{} samples found in {}.", samples.size());
+                samples.stream(this.paraFlag).forEach(x -> this.processSample(hammerDb, x, writer));
+            }
+        } finally {
+            // Insure the good-hits file is closed.
+            if (this.goodStream != null)
+                this.goodStream.close();
         }
-        log.info("{} hits output.", this.outCount);
     }
 
     /**
@@ -212,23 +229,38 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
         for (HammerDb.Hit hit : hits) {
             // Check the genome ID to insure we want this hit.
             String genomeId = hit.getGenomeId();
-            if (! blacklist.contains(genomeId)) {
-                // Get the basic output fields we need.
-                String hammerFid = hit.getFid();
-                Location loc = hit.getLoc();
-                String readId = loc.getContigId();
-                double weight = hit.getStrength();
-                String hammer = hit.getHammer();
-                // Get the sequence hit.
-                SeqRead.Part hitPart = batch.get(readId);
-                double qual = SeqRead.qualChance(hitPart.getQual(), loc.getLeft() - 1, hammers.getKmerSize());
-                // Write the hit.
-                synchronized (writer) {
-                    writer.println(sampleId + "\t" + hammer + "\t" + hammerFid + "\t" + genomeId + "\t" + readId + "\t"
-                            + Double.toString(weight) + "\t" + Double.toString(qual) + "\t" + hit.getRole());
-                    this.outCount++;
-                }
-            }
+            if (! blacklist.contains(genomeId))
+                this.writeHit(hammers, batch, sampleId, writer, hit, genomeId);
+            else if (this.goodStream != null)
+                this.writeHit(hammers, batch, sampleId, this.goodStream, hit, genomeId);
+        }
+    }
+
+    /**
+     * Write the information for a hammer hit to the specified output stream.
+     *
+     * @param hammers	main hammer database
+     * @param batch		current read batch
+     * @param sampleId	ID of the sample containing the hit
+     * @param writer	output stream for recording the hit
+     * @param hit		hit descriptor
+     * @param genomeId	repgen ID for the hammer
+     */
+    public void writeHit(HammerDb hammers, Map<String, SeqRead.Part> batch, String sampleId, PrintWriter writer,
+            HammerDb.Hit hit, String genomeId) {
+        // Get the basic output fields we need.
+        String hammerFid = hit.getFid();
+        Location loc = hit.getLoc();
+        String readId = loc.getContigId();
+        double weight = hit.getStrength();
+        String hammer = hit.getHammer();
+        // Get the sequence hit.
+        SeqRead.Part hitPart = batch.get(readId);
+        double qual = SeqRead.qualChance(hitPart.getQual(), loc.getLeft() - 1, hammers.getKmerSize());
+        // Write the hit.
+        synchronized (writer) {
+            writer.println(sampleId + "\t" + hammer + "\t" + hammerFid + "\t" + genomeId + "\t" + readId + "\t"
+                    + Double.toString(weight) + "\t" + Double.toString(qual) + "\t" + hit.getRole());
         }
     }
 
