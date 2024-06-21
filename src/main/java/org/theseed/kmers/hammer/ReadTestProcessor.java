@@ -8,21 +8,16 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UncheckedIOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
-import org.theseed.io.TabbedLineReader;
 import org.theseed.locations.Location;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.sequence.fastq.FastqSampleGroup;
@@ -126,21 +121,9 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
         } else if (! this.blackFile.canRead())
             throw new FileNotFoundException("Blacklist file " + this.blackFile + " is not found or unreadable.");
         else {
-            log.info("Reading blacklist data from {}.", this.blackFile);
-            try (TabbedLineReader blackStream = new TabbedLineReader(this.blackFile)) {
-                this.blackListMap = new HashMap<String, Set<String>>();
-                // Loop through the file.
-                for (var line : blackStream) {
-                    String sampleId = line.get(0);
-                    String blackList = line.get(1);
-                    if (! StringUtils.isEmpty(blackList)) {
-                        String[] blackGenomes = blackList.split(",\\s*");
-                        Set<String> blackSet = Arrays.stream(blackGenomes).collect(Collectors.toSet());
-                        this.blackListMap.put(sampleId, blackSet);
-                    }
-                }
-                log.info("{} blacklists read from file.", this.blackListMap.size());
-            }
+            // Read in the blacklist.
+            Map<String, Set<String>> blackMap = this.readBlackList(this.blackFile);
+            this.blackListMap = blackMap;
         }
         // Set up the expected-hits output file.
         if (this.goodFile == null)

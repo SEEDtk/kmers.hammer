@@ -149,7 +149,7 @@ public class HitStatsProcessor extends BaseReportProcessor {
             // Loop through the input files.  Note that because we have pre-filled all the maps
             // at stream level, we can do this in parallel.
             log.info("Processing input streams.");
-            this.inStreams.entrySet().stream().forEach(x -> this.analyzeFile(x));
+            this.inStreams.entrySet().parallelStream().forEach(x -> this.analyzeFile(x));
             log.info("Producing output report.");
             // We will buffer our output lines in here.
             StringBuilder outBuffer = new StringBuilder(80);
@@ -213,7 +213,7 @@ public class HitStatsProcessor extends BaseReportProcessor {
             qualStats.addValue(quality);
             weightStats.addValue(weight);
             long now = System.currentTimeMillis();
-            if (now - lastMsg >= 10000) {
+            if (now - lastMsg >= 5000) {
                 log.info("{} records read in {}.", weightStats.getN(), baseName);
                 lastMsg = now;
             }
@@ -230,15 +230,17 @@ public class HitStatsProcessor extends BaseReportProcessor {
      */
     private void writeNumData(PrintWriter writer, String label, SortedMap<String, SummaryStatistics> dataMap) {
         // Write the count.
-        writer.println(dataMap.values().stream().map(x -> Long.toString(x.getN())).collect(Collectors.joining("\t", label + " count", "")));
+        writer.println(dataMap.values().stream().map(x -> Long.toString(x.getN())).collect(Collectors.joining("\t", label + " count\t", "")));
+        // Write the sum.
+        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getSum())).collect(Collectors.joining("\t", label + " sum\t", "")));
         // Write the minimum.
-        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getMin())).collect(Collectors.joining("\t", label + " min", "")));
+        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getMin())).collect(Collectors.joining("\t", label + " min\t", "")));
         // Write the mean.
-        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getMean())).collect(Collectors.joining("\t", label + " mean", "")));
+        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getMean())).collect(Collectors.joining("\t", label + " mean\t", "")));
         // Write the maximum.
-        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getMax())).collect(Collectors.joining("\t", label + " max", "")));
+        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getMax())).collect(Collectors.joining("\t", label + " max\t", "")));
         // Write the standard deviation.
-        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getStandardDeviation())).collect(Collectors.joining("\t", label + " sdev", "")));
+        writer.println(dataMap.values().stream().map(x -> Double.toString(x.getStandardDeviation())).collect(Collectors.joining("\t", label + " sdev\t", "")));
     }
 
 }

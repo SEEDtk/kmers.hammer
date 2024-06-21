@@ -7,12 +7,20 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.basic.BaseReportProcessor;
 import org.theseed.basic.ParseFailureException;
+import org.theseed.io.TabbedLineReader;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.kmers.hammer.FindClosestProcessor;
 
@@ -97,15 +105,17 @@ public abstract class BaseHammerUsageProcessor extends BaseReportProcessor imple
         // Validate the batch size.
         if (this.batchSize < 1)
             throw new ParseFailureException("Batch size must be at least 1.");
+        // Validate the subclass parameters.  We need to do as much as possible before the long,
+        // slow load of the hammers.
+        this.validateHammerParms();
         // We must convert SQL exceptions for compatability.
         try {
+            log.info("Loading hammer database.");
             this.hammers = this.hammerType.create(this);
             this.hammers.setMethod(this.methodType);
         } catch (SQLException e) {
             throw new IOException("Database error: " + e.toString());
         }
-        // Validate the subclass parameters.
-        this.validateHammerParms();
     }
 
     /**
@@ -178,7 +188,35 @@ public abstract class BaseHammerUsageProcessor extends BaseReportProcessor imple
      * @return the count method for this hammer operation
      */
     public HammerDb.Method getMethod() {
-        return this.hammers.getCountMethod();
+        return this.methodType;
     }
+
+    /**
+     * Read in the blacklist file and return a map from the sample IDs to the expected genome IDs.
+     *
+     * @param blackFile		name of the blacklist file
+     *
+     * @return a map from each sample ID to the set of expected-genome IDs
+     *
+     * @throws IOException
+     */
+    protected Map<String, Set<String>> readBlackList(File blackFile) throws IOException {
+        Map<String, Set<String>> retVal = new HashMap<String, Set<String>>();
+        try (TabbedLineReader blackStream = new TabbedLineReader(blackFile)) {
+            // Loop through the file.
+            for (var line : blackStream) {
+                String sampleId = line.get(0);
+                String blackList = line.get(1);
+                if (! StringUtils.isEmpty(blackList)) {
+                    String[] blackGenomes = blackList.split(",\\s*");
+                    Set<String> blackSet = Arrays.stream(blackGenomes).collect(Collectors.toSet());
+                    retVal.put(sampleId, blackSet);
+                }
+            }
+            log.info("{} blacklists read from file.", retVal.size());
+        }
+        return retVal;
+    }
+
 
 }
