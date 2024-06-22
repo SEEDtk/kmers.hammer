@@ -27,11 +27,6 @@
     </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.13.1</version>
-    </dependency>
     <!-- https://mvnrepository.com/artifact/args4j/args4j -->
     <dependency>
         <groupId>args4j</groupId>
