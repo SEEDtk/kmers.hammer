@@ -44,7 +44,7 @@ public abstract class BaseSampleSampReportEvalReporter extends SummarySampReport
             String expected = desc.getRepId();
             SummaryMap.Count counter0 = counters.findCounter(expected);
             double expectedCount = counter0.getCount();
-            int expectedRoleCount = counter0.getRoleCount();
+            int expectedRoleCount = counter0.getNumRoles();
             // Count it as the best so far.
             String best = expected;
             double bestCount = expectedCount;
@@ -63,7 +63,7 @@ public abstract class BaseSampleSampReportEvalReporter extends SummarySampReport
                         bestCount = count;
                     }
                     badCount += count;
-                    int newBadRoleCount = counter.getRoleCount();
+                    int newBadRoleCount = counter.getNumRoles();
                     if (newBadRoleCount > badRoleCount)
                         badRoleCount = newBadRoleCount;
                 }

@@ -8,9 +8,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
@@ -18,6 +21,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
+import org.theseed.counters.CountMap;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.reports.eval.SampReportEvalReporter;
 import org.theseed.reports.eval.SampReportEvalReporter.SampleDescriptor;
@@ -49,6 +53,7 @@ import org.theseed.utils.StringPair;
  * --format		type of report to output (default QUALITY)
  * --distFile	name of a file containing genome distances, from the genome.distance methods command (optional)
  * --dist		index (1-based) or name of column containing thge distance to use in the distance file (default "0")
+ * --roles		tab-delimited file with headers containing a list of role IDs in the first column, for roles of special interest
  *
  * @author Bruce Parrello
  *
@@ -72,6 +77,8 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     private SampReportEvalReporter reporter;
     /** distance table */
     private Map<StringPair, Double> distTable;
+    /** role set */
+    private Set<String> roleSet;
 
     // COMMAND-LINE OPTIONS
 
@@ -90,6 +97,10 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     /** column containing the distances in the distance file */
     @Option(name = "--distCol", metaVar = "ANI", usage = "index (1-based) or name of distance column in distance file")
     private String distCol;
+
+    /** file containing roles of interest */
+    @Option(name = "--roles", metaVar = "roles.tbl", usage = "optional tab-delimited file of role IDs for roles of interest")
+    private File roleFile;
 
    /** list of input sample bin reports */
     @Argument(index = 0, metaVar = "reportFile1 reportFile2 ...", usage = "files containing sample bin reports to evaluate")
@@ -121,6 +132,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
         this.reportFiles = new ArrayList<File>();
         this.reportType = SampReportEvalReporter.Type.QUALITY;
         this.distCol = "0";
+        this.roleFile = null;
     }
 
     @Override
@@ -151,6 +163,14 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                 log.info("{} distances stored.", this.distTable.size());
             }
         }
+        // Check for a role file.
+        if (this.roleFile == null)
+            this.roleSet = Collections.emptySet();
+        else {
+            // Note we need to sort the role IDs when we read them in.
+            this.roleSet = new TreeSet<String>(TabbedLineReader.readSet(this.roleFile, "1"));
+            log.info("{} roles of interest loaded from {}.", this.roleSet.size(), this.roleFile);
+        }
     }
 
     @Override
@@ -180,6 +200,9 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
             log.info("Processing report file {} with name {}.", reportFile, reportName);
             this.reporter.openFile(reportName);
             try (TabbedLineReader reportStream = new TabbedLineReader(reportFile)) {
+                // Create a count map for the role columns.
+                String[] labels = reportStream.getLabels();
+                CountMap<String> roleCounts = new CountMap<String>();
                 // Loop through the report file.
                 for (var line : reportStream) {
                     String sampleId = line.get(0);
@@ -188,7 +211,9 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                     String repName = line.get(2);
                     double count = line.getDouble(3);
                     int roleCount = line.getInt(4);
-                    this.reporter.recordHits(desc, repId, repName, count, roleCount);
+                    for (int i = 5; i < reportStream.size(); i++)
+                        roleCounts.setCount(labels[i], line.getInt(i));
+                    this.reporter.recordHits(desc, repId, repName, count, roleCount, roleCounts);
                 }
                 // All done, finish the reporting for this sample.
                 this.reporter.closeFile();
@@ -207,6 +232,11 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
     public double getDistance(String genome1, String genome2) {
         StringPair gPair = new StringPair(genome1, genome2);
         return this.distTable.getOrDefault(gPair, Double.NaN);
+    }
+
+    @Override
+    public Set<String> getRoleSet() {
+        return this.roleSet;
     }
 
 }

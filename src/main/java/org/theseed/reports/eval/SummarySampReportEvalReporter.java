@@ -10,6 +10,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.HashMap;
 
+import org.theseed.counters.CountMap;
 import org.theseed.proteins.hammer.SummaryMap;
 
 /**
@@ -61,11 +62,11 @@ public abstract class SummarySampReportEvalReporter extends SampReportEvalReport
     protected abstract void initFile(String name);
 
     @Override
-    public final void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount) {
+    public final void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, CountMap<String> roleCounts) {
         String sampleId = desc.getSampleId();
         // Get the weight map for this sample and update it.
         SummaryMap counters = this.countMap.computeIfAbsent(sampleId, x -> new SummaryMap());
-        counters.count(repId, count, roleCount);
+        counters.count(repId, count, roleCount, roleCounts);
         // Insure we have the name saved for the repgen ID.
         this.repMap.computeIfAbsent(repId, x -> repName);
     }

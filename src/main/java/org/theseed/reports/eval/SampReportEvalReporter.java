@@ -5,7 +5,9 @@ package org.theseed.reports.eval;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Set;
 
+import org.theseed.counters.CountMap;
 import org.theseed.reports.BaseWritingReporter;
 
 /**
@@ -38,6 +40,11 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
          */
         public double getDistance(String genome1, String genome2);
 
+        /**
+         * @return the set of roles of interest
+         */
+        public Set<String> getRoleSet();
+
     }
 
     /**
@@ -63,6 +70,13 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
             @Override
             public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
                 return new DetailSampReportEvalReporter(processor, writer);
+            }
+        },
+        /** compare good and bad hits per sample by role */
+        ROLES {
+            @Override
+            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
+                return new RoleSummarySampReportEvalReporter(processor, writer);
             }
         },
         /** summary of individual sample performance in each report */
@@ -185,15 +199,16 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
     /**
      * Record hits against a sample.
      *
-     * @param desc		relevant sample descriptor
-     * @param repId		ID of the repgen hit
-     * @param repName	name of the repgen hit
-     * @param count		weighted hit count
-     * @param roleCount number of roles hit
+     * @param desc			relevant sample descriptor
+     * @param repId			ID of the repgen hit
+     * @param repName		name of the repgen hit
+     * @param count			weighted hit count
+     * @param roleCount 	number of roles hit
+     * @param roleCounts 	map of number of hits per each role
      *
      * @throws IOException
      */
-    public abstract void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount) throws IOException;
+    public abstract void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, CountMap<String> roleCounts) throws IOException;
 
     /**
      * Finish processing a bin report.

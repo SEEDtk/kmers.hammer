@@ -9,8 +9,14 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.theseed.counters.CountMap;
 
 /**
  *
@@ -21,6 +27,9 @@ import java.util.TreeSet;
  */
 public class SummaryMap {
 
+    // FIELDS
+    /** logging facility */
+    protected static Logger log = LoggerFactory.getLogger(SummaryMap.class);
     /** underlying hash map */
     private HashMap<String, Count> map;
     /** sorter for key-sorting */
@@ -37,16 +46,19 @@ public class SummaryMap {
         private int roleCount;
         /** current count value */
         private double num;
+        /** detailed counts by role */
+        private CountMap<String> roleCounts;
 
         /**
          * Create a new count.
          *
          * @param key	key being counted
          */
-        private Count(String key) {
+        protected Count(String key) {
             this.key = key;
             this.num = 0.0;
             this.roleCount = 0;
+            this.roleCounts = new CountMap<String>();
         }
 
         /**
@@ -66,8 +78,17 @@ public class SummaryMap {
         /**
          * @return the number of roles found for this key
          */
-        public int getRoleCount() {
+        public int getNumRoles() {
             return this.roleCount;
+        }
+
+        /**
+         * @return the number of hits for a specified role
+         *
+         * @param roleId	ID of the relevant role
+         */
+        public int getRoleCount(String roleId) {
+            return this.roleCounts.getCount(roleId);
         }
 
         /**
@@ -79,6 +100,7 @@ public class SummaryMap {
             this.num += other.num;
             if (other.roleCount > this.roleCount)
                 this.roleCount = other.roleCount;
+            this.roleCounts.accumulate(other.roleCounts);
         }
 
         /**
@@ -91,7 +113,7 @@ public class SummaryMap {
             // Note we compare the counts in reverse.
             int retVal = Double.compare(o.num, this.num);
             if (retVal == 0) {
-                retVal = o.getRoleCount() - this.getRoleCount();
+                retVal = o.getNumRoles() - this.getNumRoles();
                 if (retVal == 0)
                     retVal = this.key.toString().compareTo(o.key.toString());
             }
@@ -284,6 +306,14 @@ public class SummaryMap {
     }
 
     /**
+     * @return the set of all role IDs in this map
+     */
+    public Set<String> getRoleIds() {
+        return this.map.values().stream().flatMap(x -> x.roleCounts.counts().stream()).filter(x -> x.getCount() > 0)
+                .map(x -> x.getKey()).collect(Collectors.toSet());
+    }
+
+    /**
      * Remove a count from the map.
      *
      * @param key	key of the count
@@ -309,12 +339,25 @@ public class SummaryMap {
      * @param key			key for the count
      * @param count			value to add
      * @param roleCount		number of roles
+     * @param roleCounts
      */
-    public void count(String key, double count, int roleCount) {
+    public void count(String key, double count, int roleCount, CountMap<String> roleCounts) {
         Count myCount = this.getCounter(key);
         myCount.num += count;
         if (roleCount > myCount.roleCount)
             myCount.roleCount = roleCount;
+        myCount.roleCounts.accumulate(roleCounts);
     }
+
+    /**
+     * Merge a count into one of the counts in this map.
+     *
+     * @param key		key into which to merge
+     * @param counter	count to merge
+     */
+    public void merge(String key, Count counter) {
+        this.count(key, counter.num, counter.getNumRoles(), counter.roleCounts);
+    }
+
 
 }
