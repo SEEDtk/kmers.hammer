@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.theseed.counters.CountMap;
+
 /**
  *
  * This is a simple map used to score hammer hits.  The keys are representative genome IDs (strings)
@@ -35,8 +37,8 @@ public class ScoreMap {
 
         /** representative genome ID */
         private String key;
-        /** set of roles found */
-        private Set<String> roles;
+        /** counts of roles found */
+        private CountMap<String> roles;
         /** current count value */
         private double num;
 
@@ -48,7 +50,7 @@ public class ScoreMap {
         private Count(String key) {
             this.key = key;
             this.num = 0.0;
-            this.roles = new TreeSet<String>();
+            this.roles = new CountMap<String>();
         }
 
         /**
@@ -68,8 +70,17 @@ public class ScoreMap {
         /**
          * @return the number of roles found for this key
          */
-        public int getRoleCount() {
+        public int getNumRoles() {
             return this.roles.size();
+        }
+
+        /**
+         * @return the number of hits for a given role
+         *
+         * @param roleId	ID of the role in question
+         */
+        public int getRoleCount(String roleId) {
+            return this.roles.getCount(roleId);
         }
 
         /**
@@ -79,7 +90,7 @@ public class ScoreMap {
          */
         protected void merge(ScoreMap.Count other) {
             this.num += other.num;
-            this.roles.addAll(other.roles);
+            this.roles.accumulate(other.roles);
         }
 
         /**
@@ -90,7 +101,7 @@ public class ScoreMap {
          */
         protected void merge(double scale, ScoreMap.Count other) {
             this.num += scale * other.num;
-            this.roles.addAll(other.roles);
+            this.roles.accumulate(other.roles);
         }
 
         /**
@@ -103,7 +114,7 @@ public class ScoreMap {
             // Note we compare the counts in reverse.
             int retVal = Double.compare(o.num, this.num);
             if (retVal == 0) {
-                retVal = o.getRoleCount() - this.getRoleCount();
+                retVal = o.getNumRoles() - this.getNumRoles();
                 if (retVal == 0)
                     retVal = this.key.toString().compareTo(o.key.toString());
             }
@@ -158,7 +169,7 @@ public class ScoreMap {
          * @return the set of roles in this counter
          */
         public Set<String> getRoles() {
-            return this.roles;
+            return this.roles.keys();
         }
 
     }
@@ -247,7 +258,7 @@ public class ScoreMap {
    public double count(String key, double num, String role) {
        Count myCount = this.getCounter(key);
        myCount.num += num;
-       myCount.roles.add(role);
+       myCount.roles.count(role);
        return myCount.num;
    }
 
@@ -308,7 +319,8 @@ public class ScoreMap {
     public void setCount(String key, double newValue, Set<String> roles) {
        Count myCount = this.getCounter(key);
        myCount.num = newValue;
-       myCount.roles = new TreeSet<String>(roles);
+       myCount.roles = new CountMap<String>();
+       roles.stream().forEach(x -> myCount.roles.count(x));
     }
 
     /**

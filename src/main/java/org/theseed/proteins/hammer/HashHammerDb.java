@@ -95,6 +95,8 @@ public class HashHammerDb extends HammerDb {
             HammerArray gHammers = HashHammerDb.this.genomeMap.computeIfAbsent(node.getGenomeId(),
                     x -> new HammerArray(HashHammerDb.this.getKmerSize()));
             gHammers.add(HashHammerDb.this.hammerMap.encode(hammer));
+            // Save the role ID in the role list.
+            HashHammerDb.this.recordRole(roleId);
         }
 
         @Override

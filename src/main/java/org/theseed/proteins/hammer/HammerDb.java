@@ -55,6 +55,8 @@ public abstract class HammerDb {
     private int kmerSize;
     /** number of quality rejections */
     private int badQual;
+    /** set of roles found */
+    private Set<String> roles;
     /** method to use for counting hits */
     private Method countMethod = Method.COUNT;
 
@@ -414,6 +416,7 @@ public abstract class HammerDb {
      */
     protected HammerDb() {
         this.badQual = 0;
+        this.roles = new TreeSet<String>();
     }
 
     /**
@@ -713,6 +716,22 @@ public abstract class HammerDb {
      */
     public int getBadQual() {
         return this.badQual;
+    }
+
+    /**
+     * Save a role ID in the role set.
+     *
+     * @param roleId	role ID to save
+     */
+    protected void recordRole(String roleId) {
+        this.roles.add(roleId);
+    }
+
+    /**
+     * @return the set of roles in this hammer database
+     */
+    public Set<String> getRoles() {
+        return this.roles;
     }
 
 }

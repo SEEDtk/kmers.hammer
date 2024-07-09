@@ -14,10 +14,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
@@ -101,6 +103,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private ClassStrategy strategy;
     /** weight map size to use */
     private int mapSize;
+    /** set of roles being tracked, in order */
+    private List<String> roleSet;
 
     // COMMAND-LINE OPTIONS
 
@@ -236,8 +240,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.badScores = 0;
         this.goodScores = 0;
         this.badSamples = new TreeSet<String>();
+        // Get the set of roles.
+        this.roleSet = new ArrayList<String>(this.hammers.getRoles());
         // Write the report header.
-        writer.println("sample_id\trepgen_id\trepgen_name\tcount\troles");
+        writer.println("sample_id\trepgen_id\trepgen_name\tcount\troles\t" + StringUtils.join(this.roleSet, '\t'));
         // Start by connecting to the sample group.
         try (FastqSampleGroup sampleGroup = this.groupType.create(this.inDir)) {
             Set<String> samples = sampleGroup.getSampleIDs();
@@ -501,11 +507,14 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             if (scoreVal < this.minScore)
                 this.badScores++;
             else {
+                // Here we have an output line.  Get the genome data.
                 this.goodScores++;
                 String genomeId = score.getKey();
                 String genomeName = this.genomeMap.getOrDefault(genomeId, "<unknown>");
+                // Format the role counts.
+                String roleCounts = this.roleSet.stream().map(x -> Integer.toString(score.getRoleCount(x))).collect(Collectors.joining("\t"));
                 writer.println(sampleId + "\t" + genomeId + "\t" + genomeName + "\t" + score.getCount()
-                        + "\t" + score.getRoleCount());
+                        + "\t" + score.getNumRoles() + "\t" + roleCounts);
             }
         }
         // Try to keep the output aligned on sample boundaries so we can restart.

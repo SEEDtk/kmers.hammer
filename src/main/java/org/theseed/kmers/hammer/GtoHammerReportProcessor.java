@@ -184,7 +184,7 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
         String repId = score.getKey();
         String repName = this.repGenMap.get(repId);
         writer.println(prefix + "\t" + repId + "\t" + repName + "\t" + Double.toString(score.getCount())
-                + "\t" + Integer.toString(score.getRoleCount()));
+                + "\t" + Integer.toString(score.getNumRoles()));
     }
 
 }
