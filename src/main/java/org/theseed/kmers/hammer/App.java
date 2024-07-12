@@ -38,6 +38,37 @@ import org.theseed.basic.BaseProcessor;
  */
 public class App
 {
+    /** static array containing command names and comments */
+    protected static final String[] COMMANDS = new String[] {
+            "hammers", "find all the hammers for a specified set of genomes",
+             "hammersF", "use a protein-finder to find all the hammers for a specified repgen set",
+             "closest", "compute the closest genomes using the hammers",
+             "contigs", "create a FASTA file for a hammer processor from a genome directory",
+             "define", "create a hammer definition file from a roles.in.subsystems file",
+             "dbLoad", "load a hammer database from a flat file",
+             "binTest", "separate contigs into bins using hammers",
+             "contigTest", "analyze a contig FASTA file using hammers",
+             "readTest", "test a FASTQ sample and output unexpected hammer hits",
+             "scanTest", "analyze the results of a synthetic hammer test",
+             "scanLocs", "compare features hit by bad hammer matches in a synthetic test",
+             "testStats", "produce statistics for each test/match genome pair in a contig test",
+             "sampReport", "produce a bin report for a sample group using hammers",
+             "gtoReport", "count hammer hits in the genomes of a genome source",
+             "pseudoBins", "produce a simulated bin report from a binned sample group",
+             "krakenBins", "produce a simulated bin report from kraken output in a sample group",
+             "synthBins", "produce a simulated bin report from a synthetic contig file",
+             "binComp", "do a comparison of bin reports",
+             "filter", "filter a hammer database by removing hammers in other genomes",
+             "report", "produce a report on a hammer database",
+             "hammerStats", "determine which hammers were found in a contig-hammer run and how many of each",
+             "debugMeta", "isolate bad hits in a synthetic-sample contigTest used for abundance measures",
+             "sourMap", "create a map between hammer fids and SOUR role IDs",
+             "hCompare", "compare two hammer databases",
+             "sampEval", "evaluate the results of different sampReport tests",
+             "roleWeights", "modify a hammer load file to scale the weights per role",
+             "hitStats", "read multiple readTest files and produce statistics on the hits",
+             "badCheck", "analyze a bad-reads file for problematic hammers",
+    };
     public static void main( String[] args )
     {
         // Get the control parameter.
@@ -129,12 +160,21 @@ public class App
         case "badCheck" :
             processor = new BadCheckProcessor();
             break;
+        case "-h" :
+        case "--help" :
+            processor = null;
+            break;
         default :
             throw new RuntimeException("Invalid command " + command + ".");
         }
-        boolean ok = processor.parseCommand(newArgs);
-        if (ok) {
-            processor.run();
+        if (processor == null)
+            BaseProcessor.showCommands(COMMANDS);
+        else {
+            boolean ok = processor.parseCommand(newArgs);
+            if (ok) {
+                processor.run();
+            }
         }
     }
+
 }
