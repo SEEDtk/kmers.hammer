@@ -29,7 +29,7 @@ import org.theseed.utils.BasePipeProcessor;
 import org.theseed.utils.StringPair;
 
 /**
- * This command analyzes the resullts of one or more hammer tests against FASTQ samples and compares the results.
+ * This command analyzes the results of one or more hammer tests against FASTQ samples and compares the results.
  * The bin-report output files are specified as positional parameters on the command line.  The standard input
  * should contain a report characterizing the samples, all of which are expected to be single-organism read sets.
  * For each sample, the report should have the sample ID in a column named "sample_id", the organism ID and name
@@ -52,7 +52,7 @@ import org.theseed.utils.StringPair;
  *
  * --format		type of report to output (default QUALITY)
  * --distFile	name of a file containing genome distances, from the genome.distance methods command (optional)
- * --dist		index (1-based) or name of column containing thge distance to use in the distance file (default "0")
+ * --dist		index (1-based) or name of column containing the distance to use in the distance file (default "0")
  * --roles		tab-delimited file with headers containing a list of role IDs in the first column, for roles of special interest
  *
  * @author Bruce Parrello
@@ -207,6 +207,8 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                 for (var line : reportStream) {
                     String sampleId = line.get(0);
                     Descriptor desc = this.sampMap.get(sampleId);
+                    if (desc == null)
+                        throw new IOException("Sample " + sampleId + " is not in the sample input file.");
                     String repId = line.get(1);
                     String repName = line.get(2);
                     double count = line.getDouble(3);
