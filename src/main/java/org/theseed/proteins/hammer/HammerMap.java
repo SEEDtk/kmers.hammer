@@ -6,10 +6,10 @@ package org.theseed.proteins.hammer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * @author Bruce Parrello
  *
  */
-public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
+public class HammerMap<T extends HammerMap.IScore> implements Iterable<Map.Entry<String, T>> {
 
 
     // FIELDS
@@ -35,6 +35,10 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
     private int kmerSize;
     /** fixed array of sub-hashes */
     private ArrayList<SubHash> hammerMap;
+    /** number of hammers marked bad during an anchor search */
+    private int anchorBadCount;
+    /** maximum mask for anchor manipulation */
+    private long maxMask;
     /** conversion array for encoding/decoding */
     protected static final char[] CONVERTER = new char[] { 'a', 'c', 'g', 't' };
     /** number of bits occupied by the second-level part of the hammer code */
@@ -107,6 +111,31 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
             return this.nextNode;
         }
 
+        /**
+         * @return the hammer code for this node
+         */
+        public long getCode() {
+            return this.hammerCode;
+        }
+
+    }
+
+
+    /**
+     * This interface handles indicating whether a hammer is good or bad, and testing for the same.
+     */
+    public interface IScore {
+
+        /**
+         * @return TRUE if this hammer fails one of the validity tests
+         */
+        public boolean isBadHammer();
+
+        /**
+         * Soecify that this hammer is bad.
+         */
+        public void setBadHammer();
+
     }
 
 
@@ -133,6 +162,13 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
          */
         protected int size() {
             return this.size;
+        }
+
+        /**
+         * @return the number of chains in this sub-hash
+         */
+        protected int numChains() {
+            return this.table.length;
         }
 
         /**
@@ -281,7 +317,7 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
      * This class implements an iterator through the hash.  Terrible things will happen
      * if the hash is modified while iterating.
      */
-    public class Iter implements Iterator<Entry<String, T>> {
+    public class Iter implements Iterator<Map.Entry<String, T>> {
 
         /** current sub-hash */
         private SubHash subHash;
@@ -344,7 +380,7 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
         }
 
         @Override
-        public Entry<String, T> next() {
+        public Map.Entry<String, T> next() {
             if (this.next == null)
                 throw new NoSuchElementException("Attempt to read past end of hammer map.");
             var retVal = this.next;
@@ -460,6 +496,8 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
     public HammerMap(int kmerSize) {
         // Save the kmer size.
         this.kmerSize = kmerSize;
+        // Determine the maximum mask value for anchorization.
+        this.maxMask = 1L << (kmerSize * 2);
         // Determine how big a level-1 array we need.
         int highLetters = kmerSize - LOWER_CHARS;
         int level1Size = (highLetters <= 0 ? 1 : 1 << (highLetters * 2));
@@ -673,6 +711,97 @@ public class HammerMap<T> implements Iterable<Map.Entry<String, T>> {
     @Override
     public Iterator<Map.Entry<String, T>> iterator() {
         return this.new Iter();
+    }
+
+    /**
+     * This method marks as bad all hammers that are one nucleotide away from another hammer.  It is not thread-safe,
+     * but it is intended to be run only once, after all other processing is complete.
+     *
+     * @return	the number of hammers marked bad
+     */
+    public int anchorize() {
+        this.anchorBadCount = 0;
+        // Process the sub-hashes in parallel.
+        this.hammerMap.parallelStream().forEach(x -> this.anchorize(x));
+        return this.anchorBadCount;
+    }
+
+    /**
+     * Process all the good hammers in a specified sub-hash to mark hammers that are too close to other hammers as bad.
+     *
+     * @param subHash	subhash whose hammers should be checked
+     */
+    public void anchorize(HammerMap<T>.SubHash subHash) {
+        long lastMsg = System.currentTimeMillis();
+        long count = 0;
+        // Loop through the good hammers in this subhash.
+        final int n = subHash.numChains();
+        for (int i = 0; i < n; i++) {
+            Node curr = subHash.getChain(i);
+            while (curr != null) {
+                count++;
+                IScore value = curr.getValue();
+                if (! value.isBadHammer())
+                    this.processAnchor(curr.getCode(), value);
+                long now = System.currentTimeMillis();
+                if (now - lastMsg >= 10000) {
+                    log.info("{} hammers scanned for closeness in subhash.", count);
+                    lastMsg = now;
+                }
+                curr = curr.getNextNode();
+            }
+        }
+    }
+
+    /**
+     * Process a single hammer to determine if it is too close to another hammer.  If it is, the hammer itself
+     * and the first close hammer will be marked as bad.  The only modification this makes is to mark a hammer as
+     * bad, so no race condition can occur.  We expect to find only one close hammer.  If there is a second one,
+     * it will find the previous hammer when it is encountered.  Marking both saves us a tiny amount of time,
+     * but is not necessary.  We only really need to mark the current one.
+     *
+     * @param code		hammer code
+     * @param value		object attached to the hammer
+     */
+    private void processAnchor(long code, IScore value) {
+        // We loop through the hammer code, testing all the possible close values.
+        // There will be three for each hammer position.  We use bit-masking to
+        // create the alternate encodings.
+        long getMask = 3;
+        long clearMask = ~3;
+        long[] putMasks = new long[] { 0, 1, 2, 3 };
+        // This will be set to TRUE if we find a match.
+        boolean found = false;
+        while (getMask < this.maxMask && ! found) {
+            long selfMask = code & getMask;
+            long selfBase = code & clearMask;
+            for (long putMask : putMasks) {
+                if (putMask != selfMask) {
+                    long newCode = selfBase | putMask;
+                    Node newNode = this.get(newCode);
+                    if (newNode != null) {
+                        found = true;
+                        this.markBadAnchor(newNode.getValue());
+                        this.markBadAnchor(value);
+                    }
+                }
+            }
+            getMask <<= 2;
+            clearMask = ~getMask;
+            IntStream.range(0, 4).forEach(i -> putMasks[i] <<= 2);
+        }
+    }
+
+    /**
+     * Specify the the current value is a bad hammer.
+     *
+     * @param value		hammer descriptor
+     */
+    private synchronized void markBadAnchor(IScore value) {
+        if (! value.isBadHammer()) {
+            value.setBadHammer();
+            this.anchorBadCount++;
+        }
     }
 
 }

@@ -139,7 +139,7 @@ public abstract class HammerDb {
      * This object describes a hammer's source information.  It includes the source feature ID, role ID, and
      * strength.
      */
-    public static class Source implements ISource {
+    public static class Source implements ISource, HammerMap.IScore {
 
         /** source feature ID for the hammer */
         private String fid;
@@ -187,6 +187,15 @@ public abstract class HammerDb {
          */
         public String getRole() {
             return this.roleId;
+        }
+
+        @Override
+        public boolean isBadHammer() {
+            return false;
+        }
+
+        @Override
+        public void setBadHammer() {
         }
 
     }

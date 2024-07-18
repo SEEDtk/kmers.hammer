@@ -14,9 +14,7 @@ import java.util.Set;
  * @author Bruce Parrello
  *
  */
-public abstract class HammerScore {
-
-
+public abstract class HammerScore implements HammerMap.IScore {
 
     // FIELDS
     /** source feature ID */
@@ -51,6 +49,11 @@ public abstract class HammerScore {
             public HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag) {
                 return new HammerScore.Worth(fid, role, neighborSet, badFlag);
             }
+
+            @Override
+            public Object helperScan(HammerMap<HammerScore> hammers) {
+                return null;
+            }
         },
 
         /** strength is related to neighbor size; a hammer for a more-common genome is stronger */
@@ -58,6 +61,24 @@ public abstract class HammerScore {
             @Override
             public HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag) {
                 return new HammerScore.Pop(fid, role, neighborSet, badFlag);
+            }
+
+            @Override
+            public Object helperScan(HammerMap<HammerScore> hammers) {
+                return null;
+            }
+        },
+
+        /** strength is determined by the ratio between the number of hammers of a given type and the mean */
+        RATIO_BASED {
+            @Override
+            public HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag) {
+                return new RoleHammerScore(fid, role, neighborSet, badFlag);
+            }
+
+            @Override
+            public Object helperScan(HammerMap<HammerScore> hammers) {
+                return new RoleCounters(hammers);
             }
         };
 
@@ -73,6 +94,13 @@ public abstract class HammerScore {
          */
         public abstract HammerScore create(String fid, String role, Set<String> neighborSet, boolean badFlag);
 
+        /**
+         * This scans the hammer map to produce a helper object for scoring.
+         *
+         * @param hMap		hammer map to scan
+         */
+        public abstract Object helperScan(HammerMap<HammerScore> hammers);
+
     }
 
     /**
@@ -85,7 +113,7 @@ public abstract class HammerScore {
         }
 
         @Override
-        public double getStrength() {
+        public double getStrength(Object helper) {
             double retVal = this.neighborhood.size() / NORMAL_NEIGHBORHOOD;
             if (retVal > 1.0) retVal = 1.0;
             return retVal;
@@ -103,7 +131,7 @@ public abstract class HammerScore {
         }
 
         @Override
-        public double getStrength() {
+        public double getStrength(Object helper) {
             double retVal = 1.0 / NORMAL_NEIGHBORHOOD;
             if (this.goodHits > 1)
                 retVal += (this.goodHits - 1);
@@ -177,14 +205,13 @@ public abstract class HammerScore {
     }
 
     /**
-     * The strength is a measure of our confidence in the hammer.  We start with a fixed value of 1/42
-     * (42 being the mean neighborhood size), then add the fraction of the neighborhood outside the
-     * representative genome hit by the hammer.  The idea is to give extra weight to evidence that the
-     * hammer has worth, without dropping singleton neighborhoods to a weight of 0.
+     * The strength is a measure of our confidence in the hammer.
+     *
+     * @param helper	helper object produced by the hammer scan
      *
      * @return the strength of the hammer
      */
-    public abstract double getStrength();
+    public abstract double getStrength(Object helper);
 
     /**
      * @return the hammer's source feature ID
@@ -201,8 +228,9 @@ public abstract class HammerScore {
     }
 
     /**
-     * @return TRUE if this hammer was found in more than one representative
+     * @return TRUE if this hammer fails one of the validity tests
      */
+    @Override
     public boolean isBadHammer() {
         return this.badHammer;
     }
@@ -210,6 +238,7 @@ public abstract class HammerScore {
     /**
      * Soecify that this hammer is bad.
      */
+    @Override
     public void setBadHammer() {
         this.badHammer = true;
     }

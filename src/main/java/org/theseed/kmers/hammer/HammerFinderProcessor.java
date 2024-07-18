@@ -65,11 +65,12 @@ import org.theseed.utils.BasePipeProcessor;
  * --maxRepeat	maximum percent of a hammer that can belong to a single base pair type (default 0.70)
  * --para		if specified, parallel processing will be used, which increases memory size but improves performance
  * --clean		if specified, the name of a genome source for the representative genomes, to be used to clean the hammer set
- * --sType		type of strength computation to use (default POP_BASED)
+ * --sType		type of strength computation to use (default RATIO_BASED)
  * --reject		if specified, a file to contain the hammers rejected due to conflicts
  * --pegFilter	filter for features to use in the finder (default ALL)
  * --dupFilter	algorithm to use for processing multi-occurring roles in a genome (default KEEP)
  * --maxCount	maximum number of times a hammer can be found in its own genome during cleaning (default 10)
+ * --anchor		remove hammers that are very close (1 nucleotide difference) to other hammers
  *
  * @author Bruce Parrello
  *
@@ -158,8 +159,12 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
     @Option(name = "--maxCount", metaVar = "1", usage = "maximum number of duplicates allowed for a hammer in a genome")
     private int maxCount;
 
+    /** if specified, hammers that are very close to other hammers will be removed */
+    @Option(name = "--anchor", usage = "if specified, hammers that are very close to other hammers are removed")
+    private boolean anchorFlag;
+
     /** protein-finder directory */
-    @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory")
+    @Argument(index = 0, metaVar = "finderDir", usage = "protein finder directory", required = true)
     private File finderDir;
 
 
@@ -173,11 +178,12 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         this.paraFlag = false;
         this.repDir = null;
         this.sourceType = GenomeSource.Type.DIR;
-        this.strengthType = HammerScore.Type.POP_BASED;
+        this.strengthType = HammerScore.Type.RATIO_BASED;
         this.rejectFile = null;
         this.pegFilterType = HammerFeatureFilter.Type.ALL;
         this.dupFilterType = HammerDupFilter.Type.KEEP;
         this.maxCount = 10;
+        this.anchorFlag = false;
     }
 
     @Override
@@ -263,6 +269,11 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         log.info("{} total kmers scanned in neighbor genomes. Conflict count is now {}.", this.kmerCount, this.conflictCount);
         log.info("Hammer map has a load factor of {} and overload factor of {}.", this.hammerMap.loadFactor(),
                 this.hammerMap.overloadFactor());
+        if (this.anchorFlag) {
+            log.info("Scanning to remove non-anchor hammers.");
+            int removeCount = this.hammerMap.anchorize();
+            log.info("{} non-anchor hammers marked.", removeCount);
+        }
         if (this.repGenomes != null) {
             // Here we have to clean the hammers.  We scan each representative genome, and delete any hammer found outside
             // its target genome.
@@ -527,6 +538,8 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         long lowWorth = 0;
         long hammersOut = 0;
         long badHammer = 0;
+        // Create the scoring helper object.
+        Object scoreHelper = this.strengthType.helperScan(this.hammerMap);
         // Set up the reject-file stream here.
         PrintWriter rWriter = null;
         try {
@@ -546,7 +559,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
                 if (score.isBadHammer()) {
                     badHammer++;
                     if (rWriter != null)
-                        this.writeHammer(rWriter, hammer, score);
+                        this.writeHammer(rWriter, hammer, score, scoreHelper);
                 } else {
                     double worth = score.getWorthiness();
                     double precision = score.getPrecision();
@@ -557,7 +570,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
                         lowPrec++;
                     else {
                         // Here we have a good hammer.
-                        this.writeHammer(writer, hammer, score);
+                        this.writeHammer(writer, hammer, score, scoreHelper);
                         hammersOut++;
                     }
                 }
@@ -574,12 +587,13 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
     /**
      * Write a hammer to an output file.
      *
-     * @param writer	output print writer
-     * @param hammer	hammer to write
-     * @param score		associated scoring object
+     * @param writer		output print writer
+     * @param hammer		hammer to write
+     * @param score			associated scoring object
+     * @param scoreHelper	helper object for scoring
      */
-    private void writeHammer(PrintWriter writer, String hammer, HammerScore score) {
-        writer.println(hammer + "\t" + score.getFid() + "\t" + score.getStrength() + "\t"
+    private void writeHammer(PrintWriter writer, String hammer, HammerScore score, Object scoreHelper) {
+        writer.println(hammer + "\t" + score.getFid() + "\t" + score.getStrength(scoreHelper) + "\t"
                 + score.getPrecision() + "\t" + score.getWorthiness() + "\t"
                 + score.getGoodHits() + "\t" + score.getRoleId());
     }
