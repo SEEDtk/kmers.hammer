@@ -19,9 +19,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -60,7 +59,7 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  *  --url		URL of database (host and name, MySQL only)
  *  --parms 	database connection parameter string (MySQL only)
  *  --type		database engine type (default MEMORY)
- *  --para 		use parallel processing
+ *  --para 		number of parallel threads to use
  *  --min 		minimum score for an acceptable genome hit (default 10.0)
  *  --qual 		minimum quality for an acceptable sequence hit (default 0.7)
  *  --seqBatch 	maximum number of kilobases to process at one time (default 1000)
@@ -105,6 +104,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private int mapSize;
     /** set of roles being tracked, in order */
     private List<String> roleSet;
+    /** custom thread pool for parallel processing */
+    private ForkJoinPool threadPool;
 
     // COMMAND-LINE OPTIONS
 
@@ -116,9 +117,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Option(name = "--strategy", usage = "strategy for classifying sequences")
     private ClassStrategy.Type strategyType;
 
-    /** if specified, parallel processing will be used */
-    @Option(name = "--para", usage = "if specified, samples will be processed in parallel")
-    private boolean paraFlag;
+    /** number of threads to use in parallel processing */
+    @Option(name = "--para", metaVar = "60", usage = "maximum number of threads to run in parallel")
+    private int maxThreads;
 
     /** minimum acceptable hammer score */
     @Option(name = "--min", metaVar = "20.0", usage = "minimum acceptable score for a genome presence")
@@ -178,7 +179,6 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
 
     @Override
     protected void setHammerDefaults() {
-        this.paraFlag = false;
         this.groupType = FastqSampleGroup.Type.FASTQ;
         this.minScore = 10.0;
         this.minQual = 0.7;
@@ -187,6 +187,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.minDiff = 2;
         this.resumeFile = null;
         this.badBaseFilter = 1.0;
+        this.maxThreads = Runtime.getRuntime().availableProcessors();
     }
 
     @Override
@@ -226,6 +227,18 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.mapSize = this.genomeMap.size() * 4 / 3 + 1;
         // Create the strategy helper.
         this.strategy = this.strategyType.create(this);
+        int maxCores = Runtime.getRuntime().availableProcessors();
+        if (this.maxThreads > 1 && this.maxThreads > maxCores) {
+            log.warn("Too many threads specified:  reducing from {} to {}.", this.maxThreads, maxCores);
+            this.maxThreads = maxCores;
+        }
+        // Create the custom thread pool.
+        if (this.maxThreads == 1)
+            this.threadPool = null;
+        else {
+            this.threadPool = new ForkJoinPool(this.maxThreads);
+            log.info("Parallel processing selected with {} threads.", this.maxThreads);
+        }
     }
 
     @Override
@@ -252,9 +265,17 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             if (this.resumeFile != null)
                 this.processResume(samples, writer);
             // Now we loop through the samples.
-            Stream<SampleDescriptor> sampleStream = sampleGroup.stream(samples, this.paraFlag);
             log.info("Processing samples.");
-            sampleStream.forEach(x -> this.processSample(x, writer));
+            // Are we parallelizing?
+            if (this.threadPool == null) {
+                // No, use a normal stream.
+                sampleGroup.stream(samples, false).forEach(x -> this.processSample(x, writer));
+            } else try {
+                // Yes, use a parallel stream.
+                this.threadPool.submit(() -> sampleGroup.stream(samples, true).forEach(x -> this.processSample(x, writer))).get();
+            } finally {
+                this.threadPool.shutdown();
+            }
         }
         if (log.isInfoEnabled() && this.sampleCount > 0) {
             Duration allTime = Duration.ofMillis(this.processTime);
