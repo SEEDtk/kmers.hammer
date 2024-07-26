@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ForkJoinPool;
 import java.util.Set;
 import java.util.TreeMap;
 import org.kohsuke.args4j.Argument;
@@ -63,7 +64,7 @@ import org.theseed.utils.BasePipeProcessor;
  * --minPrec	minimum precision fraction for an acceptable hammer (default 0.90)
  * --minSize	minimum size for a neighborhood to be hammer-worthy (default 1)
  * --maxRepeat	maximum percent of a hammer that can belong to a single base pair type (default 0.70)
- * --para		if specified, parallel processing will be used, which increases memory size but improves performance
+ * --para		maximum number of parallel threads to use during cleaning
  * --clean		if specified, the name of a genome source for the representative genomes, to be used to clean the hammer set
  * --sType		type of strength computation to use (default RATIO_BASED)
  * --reject		if specified, a file to contain the hammers rejected due to conflicts
@@ -104,6 +105,8 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
     private HammerFeatureFilter pegFilter;
     /** duplicate-role filter to use */
     private HammerDupFilter dupFilter;
+    /** custom thread pool for parallel processing */
+    private ForkJoinPool threadPool;
 
     // COMMAND-LINE OPTIONS
 
@@ -128,8 +131,8 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
     private double maxRepeat;
 
     /** if specified, parallel processing will be used */
-    @Option(name = "--para", usage = "if specified, parallel processing will be used")
-    private boolean paraFlag;
+    @Option(name = "--para", usage = "number of threads to use during cleaning phase")
+    private int maxThreads;
 
     /** if specified, the file or directory containing a representative genome source for cleaning */
     @Option(name = "--clean", metaVar = "GTOXXX", usage = "if specified the file or directory containing the representative genomes for cleaning")
@@ -175,7 +178,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         this.minWorth = 0.0;
         this.minPeers = 1;
         this.maxRepeat = 0.70;
-        this.paraFlag = false;
+        this.maxThreads = Runtime.getRuntime().availableProcessors();
         this.repDir = null;
         this.sourceType = GenomeSource.Type.DIR;
         this.strengthType = HammerScore.Type.RATIO_BASED;
@@ -237,6 +240,13 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         }
         log.info("{} genomes sorted into {} neighborhoods.", this.genomeCount, this.neighborMap.size());
         HammerScore.setTotalGenomes(this.genomeCount);
+        // Create the custom thread pool.
+        if (this.maxThreads == 1)
+            this.threadPool = null;
+        else {
+            this.threadPool = new ForkJoinPool(this.maxThreads);
+            log.info("Parallel processing selected with {} threads.", this.maxThreads);
+        }
     }
 
     @Override
@@ -255,7 +265,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         // by representative genome, and put the good ones in the hammer map.
         var fastaFileMap = this.finder.getFastas();
         var fastaStream = fastaFileMap.entrySet().stream();
-        if (this.paraFlag)
+        if (this.threadPool != null)
             fastaStream = fastaStream.parallel();
         fastaStream.forEach(x -> this.findRoleHammers(x));
         log.info("{} hammers scanned in {} representative genomes.  {} rejected due to low complexity, {} due to conflicts, {} kept.",
@@ -263,7 +273,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         // Now we run through it all again, scoring the hammers found.  We have to do this in separate runs to avoid a race
         // condition between finding and counting relating to bad hammers.
         fastaStream = fastaFileMap.entrySet().stream();
-        if (this.paraFlag)
+        if (this.threadPool != null)
             fastaStream = fastaStream.parallel();
         fastaStream.forEach(x -> this.countRoleHammers(x));
         log.info("{} total kmers scanned in neighbor genomes. Conflict count is now {}.", this.kmerCount, this.conflictCount);
@@ -278,9 +288,16 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
             // Here we have to clean the hammers.  We scan each representative genome, and delete any hammer found outside
             // its target genome.
             var repIdStream = this.neighborMap.keySet().stream();
-            if (this.paraFlag)
-                repIdStream.parallel();
-            int cleaned = repIdStream.mapToInt(x -> this.cleanHammers(x)).sum();
+            int cleaned;
+            if (this.threadPool == null)
+                cleaned = repIdStream.mapToInt(x -> this.cleanHammers(x)).sum();
+            else try {
+                // Yes, use a parallel stream.
+                cleaned = this.threadPool.submit(() ->
+                        repIdStream.parallel().mapToInt(x -> this.cleanHammers(x)).sum()).get();
+            } finally {
+                this.threadPool.shutdown();
+            }
             log.info("{} hammers were marked bad during cleaning.", cleaned);
             log.info("Final hammer map has a load factor of {} and overload factor of {}.", this.hammerMap.loadFactor(),
                     this.hammerMap.overloadFactor());
