@@ -154,7 +154,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private File inDir;
 
     /** repgen stats file containing genome names */
-    @Argument(index = 1, metaVar = "repgen.stats.tbl", usage = "repgen stats file containing representative genome names")
+    @Argument(index = 1, metaVar = "repgen.stats.tbl", usage = "repgen stats file containing representative genome names", required = true)
     private File repStatsFile;
 
     /**
