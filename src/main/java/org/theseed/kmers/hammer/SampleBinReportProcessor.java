@@ -360,9 +360,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 mySeqsIn++;
                 double coverage = seqRead.getCoverage();
                 double expError = seqRead.getExpectedErrors();
-                if (expError >= this.badBaseFilter)
+                if (expError >= this.badBaseFilter) {
                     rejectCount++;
-                else {
+                    log.debug("{} rejected due to expected error {}.", seqRead.getLabel(), expError);
+                } else {
                     // Insure there is room in this batch for this sequence.
                     if (batchSize >= this.maxBatchDnaSize || coverage != batchCoverage) {
                         // Here we must process the current batch. Get the scores and
@@ -461,18 +462,15 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // Get all the hits for the batch, sorted by location.
         SortedSet<HammerDb.Hit> hits = this.hammers.findHits(batch.values(), this.minQual);
         // Loop through the hits. For each sequence, we compute its scores and
-        // accumulate them
-        // in the return map. This requires batching the hits. Because of the sort, all
-        // the
-        // hits for a sequence will be together. We need to remember the ID and length
-        // of the
+        // accumulate them in the return map. This requires batching the hits. Because of the sort, all
+        // the hits for a sequence will be together. We need to remember the ID and length of the
         // current sequence.
         String seqId = "";
         int seqLen = 0;
         Collection<HammerDb.Hit> hitSet = new ArrayList<HammerDb.Hit>(hits.size());
         for (var hit : hits) {
             String hitSeqId = hit.getLoc().getContigId();
-            if (!hitSeqId.contentEquals(seqId)) {
+            if (! hitSeqId.contentEquals(seqId)) {
                 // This hit is for a new batch. Process the old one.
                 if (hitSet.size() > 0) {
                     this.updateMap(coverage, stats, retVal, seqLen, hitSet);
@@ -525,9 +523,13 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         var scores = results.sortedCounts();
         for (var score : scores) {
             double scoreVal = score.getCount();
-            if (scoreVal < this.minScore)
+            if (scoreVal < this.minScore) {
                 this.badScores++;
-            else {
+                if (log.isDebugEnabled()) {
+                    String genomeId = score.getKey();
+                    log.debug("Match of {} to genome {} rejected due to low score {}.", sampleId, genomeId, scoreVal);
+                }
+            } else {
                 // Here we have an output line.  Get the genome data.
                 this.goodScores++;
                 String genomeId = score.getKey();
