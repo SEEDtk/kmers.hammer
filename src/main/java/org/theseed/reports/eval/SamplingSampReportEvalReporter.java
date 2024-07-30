@@ -24,7 +24,7 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
     public SamplingSampReportEvalReporter(IParms processor, PrintWriter writer) {
         super(processor, writer);
         // Write the report header.
-        writer.println("report_name\tsample_id\tsample_genome\texpected_rep\texpected_name\texpected_hits\texpected_hit%\texpected_roles\tbest_rep\tbest_name\tbest_hits\tbest_hit%\tbad_hits\tbad_hits%\tmax_bad_roles\tdistance");
+        writer.println("report_name\tsample_id\tsample_genome\texpected_rep\texpected_name\texpected_hits\texpected_hit%\texpected_roles\texpected_dist\tbest_rep\tbest_name\tbest_hits\tbest_hit%\tbest_dist\tbad_hits\tbad_hits%\tmax_bad_roles");
     }
 
     @Override
@@ -50,14 +50,15 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
         // Get the data for the expected repgen.
         String expected = desc.getRepId();
         String expectedName = this.getRepName(expected);
-        // Get the distance to the expected repgen.
-        double distance = this.getDistance(sampleGenome, expected);
+        // Get the distance to the expected and best repgens.
+        double expDistance = this.getDistance(sampleGenome, expected);
+        double bestDistance = this.getDistance(sampleGenome, best);
         // Finally, get the name of the best genome.
         String bestName = this.getRepName(best);
         // Write the sample data.
         writer.println(name + "\t" + sampleId + "\t" + sampleGenome + "\t" + expected + "\t" + expectedName + "\t" + expectedCount + "\t" + expectedPct
-                + "\t" + expectedRoleCount + "\t" + best + "\t" + bestName + "\t" + bestCount + "\t" + bestPct + "\t" + badCount + "\t" + badPct
-                + "\t" + badRoleCount + "\t" + distance);
+                + "\t" + expectedRoleCount + "\t" + expDistance + "\t" + best + "\t" + bestName + "\t" + bestCount + "\t" + bestPct
+                + "\t" + bestDistance + "\t" + badCount + "\t" + badPct + "\t" + badRoleCount);
     }
 
     @Override

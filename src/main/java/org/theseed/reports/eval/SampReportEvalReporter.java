@@ -85,6 +85,13 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
             public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
                 return new SamplingSampReportEvalReporter(processor, writer);
             }
+        },
+        /** comparison of distances to hit percentage for each report */
+        COMPARE {
+            @Override
+            public SampReportEvalReporter create(IParms processor, PrintWriter writer) {
+                return new CompareSampReportEvalReporter(processor, writer);
+            }
         };
 
         /**

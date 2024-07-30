@@ -52,7 +52,7 @@ import org.theseed.utils.StringPair;
  *
  * --format		type of report to output (default QUALITY)
  * --distFile	name of a file containing genome distances, from the genome.distance methods command (optional)
- * --dist		index (1-based) or name of column containing the distance to use in the distance file (default "0")
+ * --distCol	index (1-based) or name of column containing the distance to use in the distance file (default "0")
  * --roles		tab-delimited file with headers containing a list of role IDs in the first column, for roles of special interest
  *
  * @author Bruce Parrello
