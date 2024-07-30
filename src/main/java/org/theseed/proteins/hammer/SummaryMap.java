@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.theseed.counters.CountMap;
+import org.theseed.stats.WeightMap;
 
 /**
  *
@@ -47,7 +47,7 @@ public class SummaryMap {
         /** current count value */
         private double num;
         /** detailed counts by role */
-        private CountMap<String> roleCounts;
+        private WeightMap roleCounts;
 
         /**
          * Create a new count.
@@ -58,7 +58,7 @@ public class SummaryMap {
             this.key = key;
             this.num = 0.0;
             this.roleCount = 0;
-            this.roleCounts = new CountMap<String>();
+            this.roleCounts = new WeightMap();
         }
 
         /**
@@ -87,7 +87,7 @@ public class SummaryMap {
          *
          * @param roleId	ID of the relevant role
          */
-        public int getRoleCount(String roleId) {
+        public double getRoleCount(String roleId) {
             return this.roleCounts.getCount(roleId);
         }
 
@@ -339,9 +339,9 @@ public class SummaryMap {
      * @param key			key for the count
      * @param count			value to add
      * @param roleCount		number of roles
-     * @param roleCounts
+     * @param roleCounts	scores for the roles
      */
-    public void count(String key, double count, int roleCount, CountMap<String> roleCounts) {
+    public void count(String key, double count, int roleCount, WeightMap roleCounts) {
         Count myCount = this.getCounter(key);
         myCount.num += count;
         if (roleCount > myCount.roleCount)

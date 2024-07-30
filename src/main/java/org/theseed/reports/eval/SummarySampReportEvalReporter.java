@@ -10,8 +10,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.HashMap;
 
-import org.theseed.counters.CountMap;
 import org.theseed.proteins.hammer.SummaryMap;
+import org.theseed.stats.WeightMap;
 
 /**
  * This reporter tabulates the good and bad hits for each sample and provides hooks for the subclass to output
@@ -62,7 +62,7 @@ public abstract class SummarySampReportEvalReporter extends SampReportEvalReport
     protected abstract void initFile(String name);
 
     @Override
-    public final void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, CountMap<String> roleCounts) {
+    public final void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, WeightMap roleCounts) {
         String sampleId = desc.getSampleId();
         // Get the weight map for this sample and update it.
         SummaryMap counters = this.countMap.computeIfAbsent(sampleId, x -> new SummaryMap());

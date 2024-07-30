@@ -7,8 +7,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Set;
 
-import org.theseed.counters.CountMap;
 import org.theseed.reports.BaseWritingReporter;
+import org.theseed.stats.WeightMap;
 
 /**
  * This is the base clase for all sampReport evaluation reports.
@@ -215,7 +215,7 @@ public abstract class SampReportEvalReporter extends BaseWritingReporter {
      *
      * @throws IOException
      */
-    public abstract void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, CountMap<String> roleCounts) throws IOException;
+    public abstract void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, WeightMap roleCounts) throws IOException;
 
     /**
      * Finish processing a bin report.

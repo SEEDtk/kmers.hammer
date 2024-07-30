@@ -21,10 +21,10 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
-import org.theseed.counters.CountMap;
 import org.theseed.io.TabbedLineReader;
 import org.theseed.reports.eval.SampReportEvalReporter;
 import org.theseed.reports.eval.SampReportEvalReporter.SampleDescriptor;
+import org.theseed.stats.WeightMap;
 import org.theseed.utils.BasePipeProcessor;
 import org.theseed.utils.StringPair;
 
@@ -202,7 +202,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
             try (TabbedLineReader reportStream = new TabbedLineReader(reportFile)) {
                 // Create a count map for the role columns.
                 String[] labels = reportStream.getLabels();
-                CountMap<String> roleCounts = new CountMap<String>();
+                WeightMap roleCounts = new WeightMap();
                 // Loop through the report file.
                 for (var line : reportStream) {
                     String sampleId = line.get(0);
@@ -214,7 +214,7 @@ public class SampReportEvalProcessor extends BasePipeProcessor implements SampRe
                     double count = line.getDouble(3);
                     int roleCount = line.getInt(4);
                     for (int i = 5; i < reportStream.size(); i++)
-                        roleCounts.setCount(labels[i], line.getInt(i));
+                        roleCounts.setCount(labels[i], line.getDouble(i));
                     this.reporter.recordHits(desc, repId, repName, count, roleCount, roleCounts);
                 }
                 // All done, finish the reporting for this sample.

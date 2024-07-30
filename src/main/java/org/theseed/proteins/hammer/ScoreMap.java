@@ -8,17 +8,18 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import org.theseed.counters.CountMap;
+import org.theseed.stats.WeightMap;
 
 /**
  *
  * This is a simple map used to score hammer hits.  The keys are representative genome IDs (strings)
- * and the value contains a weight (floating-point count) and a set of roles found.
+ * and the value contains a total weight (floating-point count) and a weight map for the roles found.
  * *
  * @author Bruce Parrello
  *
@@ -38,7 +39,7 @@ public class ScoreMap {
         /** representative genome ID */
         private String key;
         /** counts of roles found */
-        private CountMap<String> roles;
+        private WeightMap roles;
         /** current count value */
         private double num;
 
@@ -50,7 +51,7 @@ public class ScoreMap {
         private Count(String key) {
             this.key = key;
             this.num = 0.0;
-            this.roles = new CountMap<String>();
+            this.roles = new WeightMap();
         }
 
         /**
@@ -79,7 +80,7 @@ public class ScoreMap {
          *
          * @param roleId	ID of the role in question
          */
-        public int getRoleCount(String roleId) {
+        public double getRoleScore(String roleId) {
             return this.roles.getCount(roleId);
         }
 
@@ -101,7 +102,7 @@ public class ScoreMap {
          */
         protected void merge(double scale, ScoreMap.Count other) {
             this.num += scale * other.num;
-            this.roles.accumulate(other.roles);
+            this.roles.accumulate(other.roles, scale);
         }
 
         /**
@@ -137,6 +138,10 @@ public class ScoreMap {
             int result = 1;
             result = prime * result + getEnclosingInstance().hashCode();
             result = prime * result + ((key == null) ? 0 : key.hashCode());
+            for (var key : this.roles.keys()) {
+                result = prime * result + key.hashCode();
+                result = prime * result + Double.hashCode(this.roles.getCount(key));
+            }
             return result;
         }
 
@@ -156,9 +161,19 @@ public class ScoreMap {
                     return false;
             } else if (!key.equals(other.key))
                 return false;
-            if (num != other.num)
+            else if (roles.size() != other.roles.size())
                 return false;
-            return true;
+            boolean retVal = true;
+            Iterator<WeightMap.Count> iter = this.roles.counts().iterator();
+            while (retVal && iter.hasNext()) {
+                var myCount = iter.next();
+                String key = myCount.getKey();
+                double count = myCount.getCount();
+                var otherCount = other.roles.getCount(key);
+                if (count != otherCount)
+                    retVal = false;
+            }
+            return retVal;
         }
 
         private ScoreMap getEnclosingInstance() {
@@ -170,6 +185,13 @@ public class ScoreMap {
          */
         public Set<String> getRoles() {
             return this.roles.keys();
+        }
+
+        /**
+         * @return the scores for all the roles
+         */
+        public WeightMap getRoleScores() {
+            return this.roles;
         }
 
     }
@@ -258,7 +280,7 @@ public class ScoreMap {
    public double count(String key, double num, String role) {
        Count myCount = this.getCounter(key);
        myCount.num += num;
-       myCount.roles.count(role);
+       myCount.roles.count(role, num);
        return myCount.num;
    }
 
@@ -314,13 +336,13 @@ public class ScoreMap {
      *
      * @param key		key whose count is to be set
      * @param newValue	value of the new weighted count
-     * @param roles		roles to put into the count
+     * @param weightMap		roles to put into the count
      */
-    public void setCount(String key, double newValue, Set<String> roles) {
+    public void setCount(String key, double newValue, WeightMap weightMap) {
        Count myCount = this.getCounter(key);
        myCount.num = newValue;
-       myCount.roles = new CountMap<String>();
-       roles.stream().forEach(x -> myCount.roles.count(x));
+       myCount.roles = new WeightMap();
+       myCount.roles.accumulate(weightMap);
     }
 
     /**

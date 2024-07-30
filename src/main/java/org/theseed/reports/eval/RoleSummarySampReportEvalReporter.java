@@ -97,7 +97,7 @@ public class RoleSummarySampReportEvalReporter extends SummarySampReportEvalRepo
      */
     private void writeLine(String name, String sampleId, SummaryMap.Count counter) {
         // Construct the role counts.
-        String roleCountLine = this.roleList.stream().map(x -> Integer.toString(counter.getRoleCount(x))).collect(Collectors.joining("\t"));
+        String roleCountLine = this.roleList.stream().map(x -> Double.toString(counter.getRoleCount(x))).collect(Collectors.joining("\t"));
         writer.println(name + "\t" + sampleId + "\t" + counter.getKey() + "\t" + counter.getCount() + "\t" + roleCountLine);
     }
 

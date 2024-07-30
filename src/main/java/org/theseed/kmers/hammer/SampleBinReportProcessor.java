@@ -20,7 +20,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ForkJoinPool;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -34,6 +33,7 @@ import org.theseed.sequence.fastq.FastqSampleGroup;
 import org.theseed.sequence.fastq.ReadStream;
 import org.theseed.sequence.fastq.SampleDescriptor;
 import org.theseed.sequence.fastq.SeqRead;
+import org.theseed.stats.WeightMap;
 import org.theseed.proteins.hammer.ScoreMap;
 import org.theseed.utils.BaseHammerUsageProcessor;
 
@@ -60,7 +60,7 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  *  --parms 	database connection parameter string (MySQL only)
  *  --type		database engine type (default MEMORY)
  *  --para 		number of parallel threads to use
- *  --min 		minimum score for an acceptable genome hit (default 10.0)
+ *  --min 		minimum score for an acceptable role/genome hit (default 10)
  *  --qual 		minimum quality for an acceptable sequence hit (default 0.7)
  *  --seqBatch 	maximum number of kilobases to process at one time (default 1000)
  *  --diff 		minimum number of additional hits for a region-based classification
@@ -92,9 +92,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private long qualReject;
     /** number of batches processed */
     private long batchCount;
-    /** number of genomes rejected due to low score */
+    /** number of role/genome pairs rejected due to low score */
     private long badScores;
-    /** number of genomes output for all samples */
+    /** number of role/genome pairs output for all samples */
     private long goodScores;
     /** maximum batch size in base pairs */
     private int maxBatchDnaSize;
@@ -122,7 +122,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private int maxThreads;
 
     /** minimum acceptable hammer score */
-    @Option(name = "--min", metaVar = "20.0", usage = "minimum acceptable score for a genome presence")
+    @Option(name = "--min", metaVar = "20.0", usage = "minimum acceptable score for a role/genome presence")
     private double minScore;
 
     /** minimum number of additional hits for a region-based determination to count */
@@ -522,22 +522,32 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         log.info("Writing results for sample {}.", sampleId);
         var scores = results.sortedCounts();
         for (var score : scores) {
-            double scoreVal = score.getCount();
-            if (scoreVal < this.minScore) {
-                this.badScores++;
-                if (log.isDebugEnabled()) {
-                    String genomeId = score.getKey();
-                    log.debug("Match of {} to genome {} rejected due to low score {}.", sampleId, genomeId, scoreVal);
+            WeightMap roleScores = score.getRoleScores();
+            // We need the total score, the number of roles found, and the output string for the role counts.
+            double totalScore = 0.0;
+            int roleCount = 0;
+            StringBuffer roleString = new StringBuffer(100);
+            // Only keep the roles with high enough scores.
+            for (String role : this.roleSet) {
+                double scoreVal = roleScores.getCount(role);
+                if (scoreVal < this.minScore) {
+                    this.badScores++;
+                    roleString.append("\t0.0");
+                } else {
+                    this.goodScores++;
+                    roleCount++;
+                    roleString.append('\t').append(scoreVal);
+                    totalScore += scoreVal;
                 }
-            } else {
+            }
+            if (totalScore > 0.0) {
                 // Here we have an output line.  Get the genome data.
                 this.goodScores++;
                 String genomeId = score.getKey();
                 String genomeName = this.genomeMap.getOrDefault(genomeId, "<unknown>");
                 // Format the role counts.
-                String roleCounts = this.roleSet.stream().map(x -> Integer.toString(score.getRoleCount(x))).collect(Collectors.joining("\t"));
-                writer.println(sampleId + "\t" + genomeId + "\t" + genomeName + "\t" + score.getCount()
-                        + "\t" + score.getNumRoles() + "\t" + roleCounts);
+                writer.println(sampleId + "\t" + genomeId + "\t" + genomeName + "\t" + totalScore + "\t" + roleCount
+                        + roleString.toString());
             }
         }
         // Try to keep the output aligned on sample boundaries so we can restart.

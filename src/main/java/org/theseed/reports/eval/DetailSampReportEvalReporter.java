@@ -40,7 +40,7 @@ public class DetailSampReportEvalReporter extends DetailBaseSampReportEvalReport
         double distance = this.getDistance(sampleGenomeId, repId);
         // Get the role counts.
         List<String> roleList = this.getRoles();
-        String roleCountLine = roleList.stream().map(x -> Integer.toString(repHit.getRoleCount(x))).collect(Collectors.joining("\t"));
+        String roleCountLine = roleList.stream().map(x -> Double.toString(repHit.getRoleCount(x))).collect(Collectors.joining("\t"));
         this.println(reportName + "\t" + sampleId + "\t" + sampleGenomeId + "\t" + repId + "\t"
                 + repName + "\t" + count + "\t" + pctCount + "\t" + roleCount + "\t" + distance
                 + "\t" + roleCountLine);

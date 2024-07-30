@@ -47,7 +47,7 @@ public class RegionsClassStrategy extends ClassStrategy {
             var secondCount = (sortedCounts.size() <= 1 ? 0.0 : sortedCounts.get(1).getCount());
             // If the threshold is met, count the best group.
             if (bestCounter.getCount() - secondCount >= this.minScore)
-                retVal.setCount(bestCounter.getKey(), this.getWeight(len, covg), bestCounter.getRoles());
+                retVal.setCount(bestCounter.getKey(), this.getWeight(len, covg), bestCounter.getRoleScores());
         }
         return retVal;
     }

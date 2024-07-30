@@ -10,9 +10,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.theseed.counters.CountMap;
 import org.theseed.proteins.hammer.SummaryMap;
 import org.theseed.proteins.hammer.SummaryMap.Count;
+import org.theseed.stats.WeightMap;
 
 /**
  * This base class is for reports that want to focus on detailed sample/repgen hit relationships.  It provides the hit percentage
@@ -67,7 +67,7 @@ public abstract class DetailBaseSampReportEvalReporter extends SampReportEvalRep
     }
 
     @Override
-    public void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, CountMap<String> roleCounts) throws IOException {
+    public void recordHits(SampleDescriptor desc, String repId, String repName, double count, int roleCount, WeightMap roleCounts) throws IOException {
         // Store the basic data.
         this.repNameMap.put(repId, repName);
         final String sampleId = desc.getSampleId();
