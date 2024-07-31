@@ -67,6 +67,7 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  *  --resume 	name of an existing report file containing data from samples already run
  *  --unscaled 	if specified, hit weights will not be scaled by length and coverage
  *  --filter	maximum number of expected bad base pairs for an acceptable read
+ *  --minG		minimum score for an acceptable genome hit (default 1.0)
  *
  * @author Bruce Parrello
  *
@@ -96,6 +97,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     private long badScores;
     /** number of role/genome pairs output for all samples */
     private long goodScores;
+    /** number of genome presences output */
+    private long goodGenomes;
+    /** number of genome presences rejected due to low score */
+    private long badGenomes;
     /** maximum batch size in base pairs */
     private int maxBatchDnaSize;
     /** classification strategy helper */
@@ -121,9 +126,13 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
     @Option(name = "--para", metaVar = "60", usage = "maximum number of threads to run in parallel")
     private int maxThreads;
 
-    /** minimum acceptable hammer score */
+    /** minimum acceptable hammer score for role in genome */
     @Option(name = "--min", metaVar = "20.0", usage = "minimum acceptable score for a role/genome presence")
     private double minScore;
+
+    /** minimum acceptable hammer score for whole genome */
+    @Option(name = "--minG", metaVar = "10.0", usage = "minimum acceptable score for a genome presence")
+    private double minGenomeScore;
 
     /** minimum number of additional hits for a region-based determination to count */
     @Option(name = "--diff", metaVar = "5", usage = "minimum number of additional hits required to qualify as a regional group classification")
@@ -185,6 +194,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.seqBatchSize = 1000;
         this.strategyType = ClassStrategy.Type.HITS;
         this.minDiff = 2;
+        this.minGenomeScore = 1.0;
         this.resumeFile = null;
         this.badBaseFilter = 1.0;
         this.maxThreads = Runtime.getRuntime().availableProcessors();
@@ -192,9 +202,11 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
 
     @Override
     protected void validateHammerParms() throws IOException, ParseFailureException {
-        // Validate the minimum score.
+        // Validate the minimum scores.
         if (this.minScore < 0.0)
-            throw new ParseFailureException("Minimum score cannot be negative.");
+            throw new ParseFailureException("Minimum role-score cannot be negative.");
+        if (this.minGenomeScore < 0.0)
+            throw new ParseFailureException("Minimum genome-score cannot be negative.");
         // Validate the bad-base filter.
         if (this.badBaseFilter <= 0.0)
             throw new ParseFailureException("Bad-base filter limit must be positive.");
@@ -251,6 +263,8 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.batchCount = 0;
         this.qualReject = 0;
         this.badScores = 0;
+        this.badGenomes = 0;
+        this.goodGenomes = 0;
         this.goodScores = 0;
         this.badSamples = new TreeSet<String>();
         // Get the set of roles.
@@ -283,8 +297,10 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             log.info("Process time was {}.  {} per sample.", allTime, perSample);
             log.info("{} sequences read, {} rejected, {} batches processed.", this.seqsIn, this.qualReject,
                     this.batchCount);
-            log.info("{} sample/genome pairs output, {} rejected due to low score, {} bad-quality hits ignored.",
-                    this.goodScores, this.badScores, this.hammers.getBadQual());
+            log.info("{} role/genome pairs output, {} role hits rejected due to low score, "
+                    + "{} genome hits output, {} rejected due to low score, {} bad-quality hits ignored.",
+                    this.goodScores, this.badScores, this.goodGenomes, this.badGenomes,
+                    this.hammers.getBadQual());
         }
         if (!this.badSamples.isEmpty())
             log.warn("The following samples had no data: {}", StringUtils.join(badSamples, ", "));
@@ -540,12 +556,15 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                     totalScore += scoreVal;
                 }
             }
-            if (totalScore > 0.0) {
+            if (totalScore < this.minGenomeScore) {
+                // Here the total hit is too small.
+                this.badGenomes++;
+            } else {
                 // Here we have an output line.  Get the genome data.
-                this.goodScores++;
+                this.goodGenomes++;
                 String genomeId = score.getKey();
                 String genomeName = this.genomeMap.getOrDefault(genomeId, "<unknown>");
-                // Format the role counts.
+                // Output the hit data.
                 writer.println(sampleId + "\t" + genomeId + "\t" + genomeName + "\t" + totalScore + "\t" + roleCount
                         + roleString.toString());
             }
