@@ -24,7 +24,7 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
     public SamplingSampReportEvalReporter(IParms processor, PrintWriter writer) {
         super(processor, writer);
         // Write the report header.
-        writer.println("report_name\tsample_id\tsample_genome\texpected_rep\texpected_name\texpected_hits\texpected_hit%\texpected_roles\texpected_dist\tbest_rep\tbest_name\tbest_hits\tbest_hit%\tbest_dist\tbad_hits\tbad_hits%\tmax_bad_roles");
+        writer.println("report_name\tsample_id\tsample_genome\texpected_rep\texpected_name\texpected_hits\texpected_hit%\texpected_roles\texpected_dist\tbest_rep\tbest_name\tbest_hits\tbest_hit%\tbest_roles\tbest_dist\tbad_hits\tbad_hits%\tmax_bad_roles");
     }
 
     @Override
@@ -33,7 +33,7 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
 
     @Override
     protected void processSampleData(String name, SampleDescriptor desc, double expectedCount, int expectedRoleCount, String best,
-            double bestCount, double badCount, int badRoleCount) {
+            double bestCount, int bestRoleCount, double badCount, int badRoleCount) {
         // Get the data for the sample.
         String sampleId = desc.getSampleId();
         String sampleGenome = desc.getGenomeId();
@@ -58,7 +58,7 @@ public class SamplingSampReportEvalReporter extends BaseSampleSampReportEvalRepo
         // Write the sample data.
         writer.println(name + "\t" + sampleId + "\t" + sampleGenome + "\t" + expected + "\t" + expectedName + "\t" + expectedCount + "\t" + expectedPct
                 + "\t" + expectedRoleCount + "\t" + expDistance + "\t" + best + "\t" + bestName + "\t" + bestCount + "\t" + bestPct
-                + "\t" + bestDistance + "\t" + badCount + "\t" + badPct + "\t" + badRoleCount);
+                +"\t" + bestRoleCount + "\t" + bestDistance + "\t" + badCount + "\t" + badPct + "\t" + badRoleCount);
     }
 
     @Override

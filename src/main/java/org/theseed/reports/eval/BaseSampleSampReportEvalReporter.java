@@ -43,11 +43,16 @@ public abstract class BaseSampleSampReportEvalReporter extends SummarySampReport
             // Get the expected best repgen.
             String expected = desc.getRepId();
             SummaryMap.Count counter0 = counters.findCounter(expected);
-            double expectedCount = counter0.getCount();
-            int expectedRoleCount = counter0.getNumRoles();
+            double expectedCount = 0.0;
+            int expectedRoleCount = 0;
+            if (counter0 != null) {
+                expectedCount = counter0.getCount();
+                expectedRoleCount = counter0.getNumRoles();
+            }
             // Count it as the best so far.
             String best = expected;
             double bestCount = expectedCount;
+            int bestRoleCount = expectedRoleCount;
             // Accumulate bad hits here.
             double badCount = 0.0;
             int badRoleCount = 0;
@@ -57,18 +62,19 @@ public abstract class BaseSampleSampReportEvalReporter extends SummarySampReport
                 String other = counter.getKey();
                 double count = counter.getCount();
                 if (! other.equals(expected)) {
+                    int newRoleCount = counter.getNumRoles();
                     // Here we have bad hits.
                     if (count > bestCount) {
                         best = other;
                         bestCount = count;
+                        bestRoleCount = newRoleCount;
                     }
                     badCount += count;
-                    int newBadRoleCount = counter.getNumRoles();
-                    if (newBadRoleCount > badRoleCount)
-                        badRoleCount = newBadRoleCount;
+                    if (newRoleCount > badRoleCount)
+                        badRoleCount = newRoleCount;
                 }
             }
-            this.processSampleData(name, desc, expectedCount, expectedRoleCount, best, bestCount, badCount, badRoleCount);
+            this.processSampleData(name, desc, expectedCount, expectedRoleCount, best, bestCount, bestRoleCount, badCount, badRoleCount);
         }
     }
 
@@ -81,10 +87,11 @@ public abstract class BaseSampleSampReportEvalReporter extends SummarySampReport
      * @param expectedRoleCount number of roles for expected repgen
      * @param best				ID of best repgen
      * @param bestCount			number of hits for best repgen
+     * @param bestRoleCount		number of roles for best repgen
      * @param badCount			number of hits for unexpected repgens
      * @param badRoleCount 		maximum role count for unexpected repgens
      */
     protected abstract void processSampleData(String name, SampleDescriptor desc, double expectedCount, int expectedRoleCount, String best,
-            double bestCount, double badCount, int badRoleCount);
+            double bestCount, int bestRoleCount, double badCount, int badRoleCount);
 
 }
