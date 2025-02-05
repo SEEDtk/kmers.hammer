@@ -31,11 +31,11 @@ public class TestSequenceDir {
 
     @Test
     public void testStream() {
-        File inDir = new File("data");
+        File inDir = new File("data", "seq_test");
         SequenceDirectory members = new SequenceDirectory(inDir);
-        assertThat(members.size(), equalTo(6));
+        assertThat(members.size(), equalTo(8));
         members.parallelStream().parallel().forEach(x -> this.testMember(x));
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 8; i++)
             assertThat(Integer.toString(i), this.membersFound[i]);
     }
 

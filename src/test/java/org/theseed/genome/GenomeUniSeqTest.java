@@ -25,7 +25,7 @@ public class GenomeUniSeqTest {
     @Test
     public void testBadChars() throws IOException {
         GenomeUniSequences.setKmerSize(KMER_SIZE);
-        File gtoFile = new File("data", "28181.21.gto");
+        File gtoFile = new File("data/seq_test", "28181.21.gto");
         RoleMap roles = RoleMap.load(new File("data", "roles.for.hammers"));
         Genome genome = new Genome(gtoFile);
         GenomeUniSequences seqs = new GenomeUniSequences(genome, roles);
@@ -39,7 +39,7 @@ public class GenomeUniSeqTest {
     @Test
     public void testSimple() throws IOException {
         GenomeUniSequences.setKmerSize(KMER_SIZE);
-        File gtoFile = new File("data", "171101.6.gto");
+        File gtoFile = new File("data/seq_test", "171101.6.gto");
         RoleMap roles = RoleMap.load(new File("data", "roles.for.hammers"));
         assertThat(roles.size(), equalTo(5));
         Genome genome = new Genome(gtoFile);
@@ -72,7 +72,7 @@ public class GenomeUniSeqTest {
             }
         }
         // Get a close genome.
-        File otherFile = new File("data", "1313.9775.gto");
+        File otherFile = new File("data/seq_test", "1313.9775.gto");
         var genome2 = new Genome(otherFile);
         var seqs2 = new GenomeUniSequences(genome2, roles);
         seqs2.processKmers(kmerMap);

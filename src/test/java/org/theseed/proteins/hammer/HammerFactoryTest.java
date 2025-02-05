@@ -28,7 +28,7 @@ class HammerFactoryTest {
 
     @Test
     void testHammerFactory() throws IOException {
-        File gFile = new File("data", "1002870.3.gto");
+        File gFile = new File("data/seq_test", "1002870.3.gto");
         DnaKmers.setKmerSize(20);
         Genome genome = new Genome(gFile);
         File rFile = new File("data", "roles.for.hammers");

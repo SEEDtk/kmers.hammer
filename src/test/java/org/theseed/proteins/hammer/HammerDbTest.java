@@ -98,7 +98,7 @@ class HammerDbTest {
      */
     protected void hammerDbTester(HammerDb hammers) throws FileNotFoundException, IOException {
         List<Sequence> seqs = new ArrayList<Sequence>();
-        try (FastaInputStream seqsIn = new FastaInputStream(new File("data", "hammer.test.fa"))) {
+        try (FastaInputStream seqsIn = new FastaInputStream(new File("data/seq_test", "hammer.test.fa"))) {
             for (Sequence seq : seqsIn)
                 seqs.add(seq);
         }
@@ -108,7 +108,7 @@ class HammerDbTest {
         assertThat(results.get(0).getKey(), equalTo("565575.4"));
         assertThat(results.get(1).getKey(), equalTo("1397.4"));
         assertThat(results.get(2).getKey(), equalTo("1278308.3"));
-        File gFile = new File("data", "2485170.3.gto");
+        File gFile = new File("data/seq_test", "2485170.3.gto");
         List<Sequence> gSeqs = new Genome(gFile).getSequences();
         seqs.addAll(gSeqs);
         counts = hammers.findClosest(seqs);
