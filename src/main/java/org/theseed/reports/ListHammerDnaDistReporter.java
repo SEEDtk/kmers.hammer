@@ -25,18 +25,18 @@ public class ListHammerDnaDistReporter extends HammerDnaDistReporter {
 	}
 
 	@Override
-	public void openSourReport(String sour) {
+	protected void startSour(String sour) {
 		this.sourName = sour;
 	}
 
 	@Override
-	public void processComparison(Comparison comparison) {
+	protected void processUsefulComparison(Comparison comparison) {
 		this.println(this.sourName + "\t" + comparison.getGenome1() + "\t" + comparison.getGenome2()
 				+ "\t" + comparison.getHammerDist() + "\t" + comparison.getDnaDist());
 	}
 
 	@Override
-	public void finishSourReport() {
+	public void summarizeSour(String sour, int totalCount, int usefulCount) {
 	}
 
 	@Override

@@ -22,16 +22,10 @@ import org.apache.commons.math3.stat.inference.KolmogorovSmirnovTest;
 public class CorrelationHammerDnaDistReporter extends HammerDnaDistReporter {
 
 	// FIELDS
-	/** name of the current SOUR */
-	private String sourName;
 	/** stats object for the hammer distances */
 	private DescriptiveStatistics hammerStats;
 	/** stats object for the DNA distances */
 	private DescriptiveStatistics dnaStats;
-	/** number of trivial comparisons */
-	private int trivialCount;
-	/** number of nontrivial comparisons */
-	private int nonTrivialCount;
 	/** computation helper for K-S test */
     private KolmogorovSmirnovTest ksTester;
 
@@ -48,40 +42,24 @@ public class CorrelationHammerDnaDistReporter extends HammerDnaDistReporter {
 	}
 
 	@Override
-	public void openSourReport(String sour) {
-		// Save the SOUR name.
-		this.sourName = sour;
+	protected void startSour(String sour) {
 		// Set up the stats objects.
 		this.hammerStats = new DescriptiveStatistics();
 		this.dnaStats = new DescriptiveStatistics();
-		// Clear the counters.
-		this.trivialCount = 0;
-		this.nonTrivialCount = 0;
 	}
 
 	@Override
-	public void processComparison(Comparison comparison) {
-		// Get the new values.
-		double hammerDist = comparison.getHammerDist();
-		double dnaDist = comparison .getDnaDist();
-		// Check for a trivial case.
-		if (hammerDist == dnaDist && (hammerDist == 1.0 || hammerDist == 0.0))
-			this.trivialCount++;
-		else {
-			// Here we have useful data. Add the new values to the descriptor arrays.
-			this.hammerStats.addValue(comparison.getHammerDist());
-			this.dnaStats.addValue(comparison.getDnaDist());
-			this.nonTrivialCount++;
-		}
+	protected void processUsefulComparison(Comparison comparison) {
+		// Add the new values to the descriptor arrays.
+		this.hammerStats.addValue(comparison.getHammerDist());
+		this.dnaStats.addValue(comparison.getDnaDist());
 	}
 
 	@Override
-	public void finishSourReport() {
-		// Now we have everything we need for this SOUR. First, we compute the total count.
-		int total = this.nonTrivialCount + this.trivialCount;
+	protected void summarizeSour(String sour, int totalCount, int usefulCount) {
 		// The remaining numbers only exist if there are two or more nontrivial pairs.
 		double pNum, kNum, sNum, ksHammer, ksDna;
-		if (this.nonTrivialCount >= 2) {
+		if (usefulCount >= 2) {
 			PearsonsCorrelation pearson = new PearsonsCorrelation();
 			pNum = pearson.correlation(this.hammerStats.getValues(), this.dnaStats.getValues());
 			KendallsCorrelation kendall = new KendallsCorrelation();
@@ -100,7 +78,7 @@ public class CorrelationHammerDnaDistReporter extends HammerDnaDistReporter {
 			ksDna = 0.0;
 		}
 		// Write the output line.
-		this.println(this.sourName + "\t" + total + "\t" + this.nonTrivialCount + "\t" + pNum
+		this.println(sour + "\t" + totalCount + "\t" + usefulCount + "\t" + pNum
 				+ "\t" + kNum + "\t" + sNum + "\t" + ksHammer + "\t" + ksDna);
 	}
 

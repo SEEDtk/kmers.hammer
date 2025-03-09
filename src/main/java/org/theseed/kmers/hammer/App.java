@@ -165,6 +165,9 @@ public class App
         case "distCheck" :
         	processor = new HammerDnaDistCompareProcessor();
         	break;
+        case "massDistCheck" :
+        	processor = new MassHammerDnaDistCompareProcessor();
+        	break;
         case "-h" :
         case "--help" :
             processor = null;

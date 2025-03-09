@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Feature;
 import org.theseed.io.TabbedLineReader;
+import org.theseed.kmers.filter.CompareFilter;
 import org.theseed.proteins.hammer.HammerDb;
 import org.theseed.reports.HammerDnaDistReporter;
 import org.theseed.sequence.DnaKmers;
@@ -58,11 +59,13 @@ import org.theseed.utils.BaseHammerUsageProcessor;
  * --parms		database connection parameter string (MySQL only)
  * --type		database engine type
  * --format		format of the output report (default CORRELATION)
+ * --filter		filtering method to use for comparisons (default EXTREME)
  *
  * @author Bruce Parrello
  *
  */
-public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor implements HammerDnaDistReporter.IParms {
+public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor
+		implements HammerDnaDistReporter.IParms, CompareFilter.IParms {
 
 	// FIELDS
 	/** logging facility */
@@ -73,6 +76,10 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 	private ProteinFinder finder;
 	/** set of genome IDs */
 	private Set<String> genomeSet;
+	/** trivial-compare filter */
+	private CompareFilter filter;
+	/** map of SOURs to FASTA files */
+	private Map<String, File> sourMap;
 
 	// COMMAND-LINE OPTIONS
 
@@ -90,6 +97,10 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 	@Option(name = "--format", usage = "format of the output report")
 	private HammerDnaDistReporter.Type reportType;
 
+	/** type of comparison filtering to use */
+	@Option(name = "--filter", usage = "method for filtering comparisons")
+	private CompareFilter.Type filterType;
+
 	/** name of the finder directory used to create the hammers */
 	@Argument(index = 0, metaVar = "finderDir", usage = "name of the finder directory used to create the hammers",
 			required = true)
@@ -100,16 +111,17 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 		this.inFile = null;
 		this.idCol = "1";
 		this.reportType = HammerDnaDistReporter.Type.CORRELATION;
+		this.filterType = CompareFilter.Type.EXTREME;
 	}
 
 	@Override
 	protected void validateHammerParms() throws IOException, ParseFailureException {
-		// Create the output report writer.
-		this.reporter = this.reportType.create(this);
 		// Load the protein finder.
 		if (! this.finderDir.isDirectory())
 			throw new FileNotFoundException("Finder directory " + this.finderDir + " is not found or invalid.");
 		this.finder = new ProteinFinder(this.finderDir);
+		// Create the comparison filter. We must do this before creating the report writer.
+		this.filter = this.filterType.create(this);
 		// Now read in the genome IDs.
 		this.genomeSet = new HashSet<String>();
 		try (TabbedLineReader gReader = this.openInput()) {
@@ -121,6 +133,38 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 			}
 		}
 		log.info("{} genome IDs read from input.", this.genomeSet.size());
+		// Create the output report writer.
+		this.reporter = this.reportType.create(this);
+	}
+
+	/**
+	 * Set up the parameters for all externally-commanded runs.
+	 *
+	 * @param finderDir1	the protein-finder directory to use
+	 * @param filterType1	the type of comparison filtering to use
+	 *
+	 * @throws IOException
+	 */
+	public void setupAllRuns(File finderDir1, CompareFilter.Type filterType1) throws IOException {
+		this.finder = new ProteinFinder(finderDir1);
+		log.info("Using finder in directory {}.", finderDir1);
+		this.filter = filterType1.create(this);
+		log.info("Filtering out {} comparisons.", filterType1);
+		// Get the map of SOURs to FASTA files.
+		this.sourMap = this.finder.getFastas();
+		log.info("{} SOURs in protein finder.", sourMap.size());
+	}
+
+	/**
+	 * Set up the parameters for an individual run.
+	 *
+	 * @param gSet			input genome set to use
+	 * @param reportType1	type of report to write
+	 */
+	public void setupOneRun(Set<String> gSet, HammerDnaDistReporter.Type reportType1) {
+		this.reporter = reportType1.create(this);
+		this.genomeSet = gSet;
+		log.info("Producing {} report for {}-genome input set.", reportType1, gSet.size());
 	}
 
 	/**
@@ -148,13 +192,10 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 	protected void runHammers(HammerDb hammerDb, PrintWriter writer) throws Exception {
 		// Start the report.
 		this.reporter.openReport(writer);
-		// Get the map of SOURs to FASTA files.
-		Map<String, File> sourMap = this.finder.getFastas();
-		log.info("{} SOURs in protein finder.", sourMap.size());
 		// Save the kmer size for performance.
 		DnaKmers.setKmerSize(hammerDb.getKmerSize());
 		// Loop through the SOURs.
-		for (var sourEntry : sourMap.entrySet()) {
+		for (var sourEntry : this.sourMap.entrySet()) {
 			// Get the data for this SOUR.
 			String sourName = sourEntry.getKey();
 			File sourFile = sourEntry.getValue();
@@ -186,9 +227,9 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 			}
 			// Now we loop through the map, performing comparisons. This is a quadratic operation, since
 			// we compare each instance to all the instances after it in the map (which is why the
-			// NavigableMap interface is being used). We do it in parallel to get a speed boost.
+			// NavigableMap interface is being used).
 			log.info("Processing {} comparisons for {}.", dnaMap.size() * (dnaMap.size() - 1) / 2, sourName);
-			this.genomeSet.stream().forEach(x -> this.runComparisons(sourName, x, dnaMap, hammerMap));
+			this.genomeSet.stream().parallel().forEach(x -> this.runComparisons(sourName, x, dnaMap, hammerMap));
 			log.info("Comparisons completed for {}.", sourName);
 			this.reporter.finishSourReport();
 		}
@@ -240,6 +281,11 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor impl
 				resultList.stream().forEach(x -> this.reporter.processComparison(x));
 			}
 		}
+	}
+
+	@Override
+	public CompareFilter getFilter() {
+		return this.filter;
 	}
 
 }

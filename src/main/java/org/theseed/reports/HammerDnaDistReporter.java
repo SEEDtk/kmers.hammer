@@ -3,6 +3,8 @@
  */
 package org.theseed.reports;
 
+import org.theseed.kmers.filter.CompareFilter;
+
 /**
  * This is the base class for all reports comparing hammer and DNA distances.
  *
@@ -11,11 +13,26 @@ package org.theseed.reports;
  */
 public abstract class HammerDnaDistReporter extends BaseReporterReporter {
 
+	// FIELDS
+	/** comparison filter */
+	private CompareFilter filter;
+	/** total number of comparisons */
+	private int total;
+	/** number of useful comparisons */
+	private int useful;
+	/** name of current SOUR */
+	private String sourName;
+
 	/**
 	 * This interface must be supported by any controlling command processor that
 	 * generates a hammer/DNA distance comparison report.
 	 */
 	public interface IParms {
+
+		/**
+		 * @return the comparison filter
+		 */
+		public CompareFilter getFilter();
 
 	}
 
@@ -112,6 +129,7 @@ public abstract class HammerDnaDistReporter extends BaseReporterReporter {
 	 * @param processor		controlling command processor
 	 */
 	public HammerDnaDistReporter(IParms processor) {
+		this.filter = processor.getFilter();
 	}
 
 	/**
@@ -119,19 +137,59 @@ public abstract class HammerDnaDistReporter extends BaseReporterReporter {
 	 *
 	 * @param sourName	name of the SOUR
 	 */
-	public abstract void openSourReport(String sourName);
+	final public void openSourReport(String sour) {
+		// Clear the counters.
+		this.total = 0;
+		this.useful = 0;
+		// Save the SOUR name.
+		this.sourName = sour;
+		// Give the subclass a chance to initialize.
+		this.startSour(sour);
+	}
+
+	/**
+	 * Initialize the report section for a SOUR.
+	 *
+	 * @param sour	name of the SOUR
+	 */
+	protected abstract void startSour(String sour);
 
 	/**
 	 * Record the result for a single comparison.
 	 *
 	 * @param comparison	comparison result to record
 	 */
-	public abstract void processComparison(Comparison comparison);
+	final public void processComparison(Comparison comparison) {
+		this.total++;
+		if (this.filter.isUseful(comparison)) {
+			this.useful++;
+			this.processUsefulComparison(comparison);
+		}
+
+	}
+
+	/**
+	 * Process a comparison that goes into the report.
+	 *
+	 * @param comparison	comparison to process
+	 */
+	protected abstract void processUsefulComparison(Comparison comparison);
 
 	/**
 	 * Total and optionally output data for a single SOUR.
 	 */
-	public abstract void finishSourReport();
+	final public void finishSourReport() {
+		this.summarizeSour(this.sourName, this.total, this.useful);
+	}
+
+	/**
+	 * Produce the summary information for the current SOUR.
+	 *
+	 * @param sour			name of the SOUR
+	 * @param totalCount	total number of comparisons
+	 * @param usefulCount	number of useful comparisons
+	 */
+	protected abstract void summarizeSour(String sour, int totalCount, int usefulCount);
 
 	/**
 	 * Total and optionally output data for the entire report.
