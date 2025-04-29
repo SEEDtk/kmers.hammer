@@ -50,7 +50,7 @@ public class HammerDbLoadProcessor extends BaseDbProcessor {
     private File initFile;
 
     /** input hammer file */
-    @Argument(index = 0, metaVar = "hammers.tbl", usage = "hammer input file")
+    @Argument(index = 0, metaVar = "hammers.tbl", usage = "hammer input file", required = true)
     private File inFile;
 
     @Override
