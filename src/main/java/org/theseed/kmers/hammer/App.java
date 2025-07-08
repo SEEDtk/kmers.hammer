@@ -36,6 +36,7 @@ import org.theseed.basic.BaseProcessor;
  *  hitStats		read multiple readTest files and produce statistics on the hits
  *  badCheck		analyze a bad-reads file for problematic hammers
  *  distCheck		compare the hammer distance between SOURs with the DNA kmer distance
+ *  readCheck       compare the DNA kmers in a FASTQ file with the DNA kmers in a genome
  */
 public class App
 {
@@ -69,7 +70,8 @@ public class App
              "roleWeights", "modify a hammer load file to scale the weights per role",
              "hitStats", "read multiple readTest files and produce statistics on the hits",
              "badCheck", "analyze a bad-reads file for problematic hammers",
-             "distCheck", "compare the hammer distance between SOURs with the DNA kmer distance"
+             "distCheck", "compare the hammer distance between SOURs with the DNA kmer distance",
+             "readCheck", "compare the DNA kmers in a FASTQ file with the DNA kmers in a genome"
     };
     public static void main( String[] args )
     {
@@ -168,6 +170,9 @@ public class App
         case "massDistCheck" :
         	processor = new MassHammerDnaDistCompareProcessor();
         	break;
+        case "readCheck" :
+            processor = new GtoToReadCheckProcessor();
+            break;
         case "-h" :
         case "--help" :
             processor = null;
