@@ -76,7 +76,7 @@ public class HammerFastaProcessor extends BaseProcessor {
     }
 
     @Override
-    protected boolean validateParms() throws IOException, ParseFailureException {
+    protected void validateParms() throws IOException, ParseFailureException {
         // Load the representative-genome database.
         if (! this.repDbFile.canRead())
             throw new FileNotFoundException("Repgen database file " + this.repDbFile + " is not found or unreadable.");
@@ -89,7 +89,6 @@ public class HammerFastaProcessor extends BaseProcessor {
         this.genomes = this.sourceType.create(this.inDir);
         // Create the contig ID set.  This is used to prevent duplicate labels.
         this.contigIds = new HashSet<String>(this.genomes.size() * 125);
-        return true;
     }
 
     @Override

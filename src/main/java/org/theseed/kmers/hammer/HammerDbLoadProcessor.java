@@ -60,7 +60,7 @@ public class HammerDbLoadProcessor extends BaseDbProcessor {
     }
 
     @Override
-    protected boolean validateParms() throws IOException, ParseFailureException {
+    protected void validateParms() throws IOException, ParseFailureException {
         // Validate the initialization file.
         if (this.initFile != null && ! this.initFile.canRead())
             throw new FileNotFoundException("DB initialization SQL file " + this.initFile + " is not found or unreadable.");
@@ -69,7 +69,6 @@ public class HammerDbLoadProcessor extends BaseDbProcessor {
             throw new FileNotFoundException("Hammer input file " + this.inFile + " is not found or unreadable.");
         else
             log.info("Database will be loaded from {}.", this.inFile);
-        return true;
     }
 
     @Override

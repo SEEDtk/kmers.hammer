@@ -183,10 +183,8 @@ public class App
         if (processor == null)
             BaseProcessor.showCommands(COMMANDS);
         else {
-            boolean ok = processor.parseCommand(newArgs);
-            if (ok) {
-                processor.run();
-            }
+            processor.parseCommand(newArgs);
+            processor.run();
         }
     }
 
