@@ -44,7 +44,7 @@ public class HammerDefineProcessor extends BasePipeProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerDefineProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerDefineProcessor.class);
     /** set of roles to keep */
     private Set<String> goodRoles;
     /** expected number of roles */

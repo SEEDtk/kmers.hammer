@@ -44,7 +44,7 @@ public class PseudoBinReportProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(PseudoBinReportProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(PseudoBinReportProcessor.class);
     /** map of genome IDs to representative genome IDs */
     private Map<String, String> repGenMap;
     /** map of representative genome IDs to names */

@@ -40,7 +40,7 @@ public class RoleWeightProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(RoleWeightProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(RoleWeightProcessor.class);
     /** genome -> role -> count */
     private Map<String, CountMap<String>> countMaps;
     /** feature ID input column index */

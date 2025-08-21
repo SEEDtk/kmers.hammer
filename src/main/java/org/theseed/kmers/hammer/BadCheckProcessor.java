@@ -71,7 +71,7 @@ public class BadCheckProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(BadCheckProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(BadCheckProcessor.class);
     /** genome source for representative genomes */
     private GenomeSource repGenomes;
     /** map of sample IDs to expected genome sets */

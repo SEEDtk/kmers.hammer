@@ -52,7 +52,7 @@ public class ContigTestProcessor extends BaseReportProcessor implements HammerDb
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(ContigTestProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(ContigTestProcessor.class);
     /** hammer database */
     private HammerDb hammers;
     /** optimal number of base pairs per sequence group */

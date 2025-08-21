@@ -61,7 +61,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(BinReportCompareProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(BinReportCompareProcessor.class);
     /** engine for spearman's correlation */
     private SpearmansCorrelation spearmanEngine;
     /** engine for pearson's coefficient */

@@ -47,7 +47,7 @@ public class HammerStatsProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerStatsProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerStatsProcessor.class);
     /** map of hammers to info counts */
     private Map<String, HammerCount> countMap;
 

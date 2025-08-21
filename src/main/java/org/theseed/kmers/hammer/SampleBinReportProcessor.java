@@ -76,7 +76,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(SampleBinReportProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(SampleBinReportProcessor.class);
     /** hammer database */
     private HammerDb hammers;
     /** map of genome IDs to names */

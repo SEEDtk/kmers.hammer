@@ -69,7 +69,7 @@ public class HammerDnaDistCompareProcessor extends BaseHammerUsageProcessor
 
 	// FIELDS
 	/** logging facility */
-	protected static Logger log = LoggerFactory.getLogger(HammerDnaDistCompareProcessor.class);
+	private static final Logger log = LoggerFactory.getLogger(HammerDnaDistCompareProcessor.class);
 	/** output report writer */
 	private HammerDnaDistReporter reporter;
 	/** protein finder */

@@ -14,8 +14,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.stats.WeightMap;
 
 /**
@@ -28,10 +26,8 @@ import org.theseed.stats.WeightMap;
 public class SummaryMap {
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(SummaryMap.class);
     /** underlying hash map */
-    private HashMap<String, Count> map;
+    private final HashMap<String, Count> map;
     /** sorter for key-sorting */
     private static final Comparator<Count> KEY_SORTER = new KeySorter();
 
@@ -41,13 +37,13 @@ public class SummaryMap {
     public class Count implements Comparable<Count> {
 
         /** representative genome ID */
-        private String key;
+        private final String key;
         /** number of roles found */
         private int roleCount;
         /** current count value */
         private double num;
         /** detailed counts by role */
-        private WeightMap roleCounts;
+        private final WeightMap roleCounts;
 
         /**
          * Create a new count.
@@ -115,7 +111,7 @@ public class SummaryMap {
             if (retVal == 0) {
                 retVal = o.getNumRoles() - this.getNumRoles();
                 if (retVal == 0)
-                    retVal = this.key.toString().compareTo(o.key.toString());
+                    retVal = this.key.compareTo(o.key);
             }
             return retVal;
         }
@@ -125,7 +121,7 @@ public class SummaryMap {
          */
         @Override
         public String toString() {
-            String retVal = String.format("%s (weight %s)", this.key.toString(),
+            String retVal = String.format("%s (weight %s)", this.key,
                         this.num);
             return retVal;
         }
@@ -155,9 +151,7 @@ public class SummaryMap {
                     return false;
             } else if (!key.equals(other.key))
                 return false;
-            if (num != other.num)
-                return false;
-            return true;
+            return (num == other.num);
         }
 
         private SummaryMap getEnclosingInstance() {
@@ -183,7 +177,7 @@ public class SummaryMap {
      * Create a blank weighted-counting map.
      */
     public SummaryMap() {
-        this.map = new HashMap<String, Count>();
+        this.map = new HashMap<>();
     }
 
     /*
@@ -192,7 +186,7 @@ public class SummaryMap {
      * @param capacity	number of keys expected
      */
     public SummaryMap(int capacity) {
-        this.map = new HashMap<String, Count>(capacity * 4 / 3 + 1);
+        this.map = new HashMap<>(capacity * 4 / 3 + 1);
     }
 
     /**
@@ -242,7 +236,7 @@ public class SummaryMap {
      * @return	a sorted collection of all the keys in this object
      */
     public SortedSet<String> keys() {
-        TreeSet<String> retVal = new TreeSet<String>(this.map.keySet());
+        TreeSet<String> retVal = new TreeSet<>(this.map.keySet());
         return retVal;
     }
 
@@ -257,7 +251,7 @@ public class SummaryMap {
      * @return a list of all the counts in this object, sorted from highest to lowest
      */
     public List<Count> sortedCounts() {
-        ArrayList<Count> retVal = new ArrayList<Count>(this.map.values());
+        ArrayList<Count> retVal = new ArrayList<>(this.map.values());
         retVal.sort(null);
         return retVal;
     }
@@ -266,7 +260,7 @@ public class SummaryMap {
      * @return a list of all the counts in the object, sorted by key
      */
     public List<Count> keyedCounts() {
-        ArrayList<Count> retVal = new ArrayList<Count>(this.map.values());
+        ArrayList<Count> retVal = new ArrayList<>(this.map.values());
         retVal.sort(KEY_SORTER);
         return retVal;
     }
@@ -328,7 +322,7 @@ public class SummaryMap {
     public Count getBestEntry() {
         Count retVal = null;
         // We get the minimum, since counts sort with the highest first.
-        if (this.map.size() > 0)
+        if (! this.map.isEmpty())
             retVal = Collections.min(this.map.values());
         return retVal;
     }

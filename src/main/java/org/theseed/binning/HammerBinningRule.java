@@ -5,8 +5,6 @@ package org.theseed.binning;
 
 import java.io.IOException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.counters.CountMap;
 
@@ -44,10 +42,6 @@ public abstract class HammerBinningRule {
 
         public abstract HammerBinningRule create(IParms processor) throws IOException, ParseFailureException;
     }
-
-    // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerBinningRule.class);
 
     /**
      * Choose the bin for a contig.

@@ -26,7 +26,7 @@ public class RoleCounters {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(RoleCounters.class);
+    private static final Logger log = LoggerFactory.getLogger(RoleCounters.class);
     /** count hash */
     private Map<String, CountMap<String>> roleCountMaps;
     /** mean count value */

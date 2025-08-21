@@ -24,7 +24,7 @@ import org.theseed.sequence.Sequence;
 class TestKmerIterable {
 
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(TestKmerIterable.class);
+    private static final Logger log = LoggerFactory.getLogger(TestKmerIterable.class);
 
 
     @Test

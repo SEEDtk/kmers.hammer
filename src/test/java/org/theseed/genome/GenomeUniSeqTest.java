@@ -20,7 +20,7 @@ public class GenomeUniSeqTest {
     /** kmer size for testing */
     private static final int KMER_SIZE = 20;
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(GenomeUniSeqTest.class);
+    private static final Logger log = LoggerFactory.getLogger(GenomeUniSeqTest.class);
 
     @Test
     public void testBadChars() throws IOException {

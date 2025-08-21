@@ -6,8 +6,6 @@ package org.theseed.proteins.hammer;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.genome.Contig;
 import org.theseed.sequence.DnaKmers;
 
@@ -25,15 +23,12 @@ import org.theseed.sequence.DnaKmers;
 public class HammerKmers {
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerKmers.class);
-
     /** feature ID for the originating sequence */
-    private String fid;
+    private final String fid;
     /** sequence in the forward direction */
-    private String forward;
+    private final String forward;
     /** sequence on the reverse strand */
-    private String reverse;
+    private final String reverse;
     /** kmer size to use */
     private static int K = 20;
 

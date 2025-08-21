@@ -59,7 +59,7 @@ public class GtoHammerReportProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(GtoHammerReportProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GtoHammerReportProcessor.class);
     /** input genome source */
     private GenomeSource genomes;
     /** map of representative genome IDs to names */

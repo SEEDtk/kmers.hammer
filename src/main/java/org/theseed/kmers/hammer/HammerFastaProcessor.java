@@ -44,7 +44,7 @@ public class HammerFastaProcessor extends BaseProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerFastaProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerFastaProcessor.class);
     /** input genome source */
     private GenomeSource genomes;
     /** set of contig IDs already used */

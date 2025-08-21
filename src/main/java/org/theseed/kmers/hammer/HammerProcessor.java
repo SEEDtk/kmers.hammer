@@ -76,7 +76,7 @@ public class HammerProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerProcessor.class);
     /** input genome source */
     private GenomeSource genomes;
     /** filtered set of IDs for genomes to process */

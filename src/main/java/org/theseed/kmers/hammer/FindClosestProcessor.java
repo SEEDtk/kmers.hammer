@@ -60,7 +60,7 @@ public class FindClosestProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(FindClosestProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(FindClosestProcessor.class);
     /** hammer database */
     private HammerDb hammers;
     /** input directory streamer */

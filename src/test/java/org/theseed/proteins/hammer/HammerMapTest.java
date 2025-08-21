@@ -23,7 +23,7 @@ import org.theseed.io.TabbedLineReader;
 class HammerMapTest {
 
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerMapTest.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerMapTest.class);
     /** nucleotide letters */
     private static final String[] NUCLEONS = new String[] { "a", "c", "g", "t" };
 

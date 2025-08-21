@@ -47,7 +47,7 @@ public class HitStatsProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HitStatsProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HitStatsProcessor.class);
     /** map of stream names to input streams */
     private SortedMap<String, TabbedLineReader> inStreams;
     /** map of stream names to role-ids to hit-weight statistics */

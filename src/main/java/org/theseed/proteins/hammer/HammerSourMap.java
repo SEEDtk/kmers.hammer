@@ -27,7 +27,7 @@ public class HammerSourMap implements Serializable {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerSourMap.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerSourMap.class);
     /** map from hammer feature IDs to role IDs */
     private HashMap<String, String> sourMap;
     /** object version ID for serialization */

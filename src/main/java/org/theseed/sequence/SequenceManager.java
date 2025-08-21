@@ -7,9 +7,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * This object manages a list of sequences read from a FASTA file.  The actual iteration is managed by the
  * subclass, which either keeps all the sequences in memory, reads each one from a file every time, or
@@ -20,10 +17,6 @@ import org.slf4j.LoggerFactory;
  *
  */
 public abstract class SequenceManager {
-
-    // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(SequenceManager.class);
 
     /**
      * This is the base class for the iterators we create.  It insures they are closed (if needed)

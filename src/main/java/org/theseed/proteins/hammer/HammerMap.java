@@ -30,7 +30,7 @@ public class HammerMap<T extends HammerMap.IScore> implements Iterable<Map.Entry
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerMap.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerMap.class);
    /** hammer kmer size */
     private int kmerSize;
     /** fixed array of sub-hashes */

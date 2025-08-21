@@ -34,7 +34,7 @@ public class BinBuilder implements AutoCloseable {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(BinBuilder.class);
+    private static final Logger log = LoggerFactory.getLogger(BinBuilder.class);
     /** binning rule */
     private IRule rule;
     /** map of bin IDs to control objects */

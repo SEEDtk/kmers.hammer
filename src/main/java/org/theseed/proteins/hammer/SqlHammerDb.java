@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.theseed.counters.CountMap;
 import org.theseed.java.erdb.DbConnection;
 import org.theseed.java.erdb.DbLoader;
@@ -36,10 +38,12 @@ import org.theseed.sequence.Sequence;
 public class SqlHammerDb extends HammerDb {
 
     // FIELDS
+    /** logging facility */
+    private static final Logger log = LoggerFactory.getLogger(SqlHammerDb.class);
     /** connection to the database */
-    private DbConnection db;
+    private final DbConnection db;
     /** batch size to use */
-    private int batchSize;
+    private final int batchSize;
     /** size of a hash to hold a kmer batch */
     private int hashSize;
 
@@ -69,7 +73,7 @@ public class SqlHammerDb extends HammerDb {
     /**
      * Initialize the object fields.
      */
-    protected void init() {
+    protected final void init() {
         this.hashSize = this.batchSize * 4 / 3 + 1;
         // We need to compute the kmer size.  Get one kmer.
         SqlBuffer sizeQuery = new SqlBuffer(this.db).append("SELECT ").quote("Hammer", "hammer")
@@ -268,7 +272,7 @@ public class SqlHammerDb extends HammerDb {
         // with dummy fids and roles. The output collection will retain the hits that are found.
         try {
             // Set up a map to hold the batches.
-            Map<String, List<HammerDb.Hit>> batchMap = new HashMap<String, List<HammerDb.Hit>>(this.hashSize);
+            Map<String, List<HammerDb.Hit>> batchMap = new HashMap<>(this.hashSize);
             // Create a query.
             DbQuery query = null;
             try {
@@ -368,7 +372,7 @@ public class SqlHammerDb extends HammerDb {
                     kmers.add(kmer);
                     if (kmers.size() == this.batchSize) {
                         // Now we run the query.
-                        this.runHammerQuery(query, kmers, hammerSet);
+                        this.runHammerQuery(query, kmers);
                         // Clear the kmer set for the next query.
                         kmers.clear();
                     }
@@ -378,12 +382,12 @@ public class SqlHammerDb extends HammerDb {
                     query.close();
             }
             // Do we have a residual?
-            if (kmers.size() > 0) {
+            if (! kmers.isEmpty()) {
                 // Yes.  Create a mini-query for it.
                 query = null;
                 try {
                     query = this.buildBatchSetQuery(kmers.size());
-                    this.runHammerQuery(query, kmers, hammerSet);
+                    this.runHammerQuery(query, kmers);
                 } finally {
                     if (query != null)
                         query.close();
@@ -400,11 +404,10 @@ public class SqlHammerDb extends HammerDb {
      *
      * @param query		query object to use
      * @param kmers		set of kmers to check
-     * @param hammerSet	output set into which hammers found are placed
      *
      * @throws SQLException
      */
-    private void runHammerQuery(DbQuery query, HashSet<String> kmers, HashSet<String> hammerSet) throws SQLException {
+    private void runHammerQuery(DbQuery query, HashSet<String> kmers) throws SQLException {
         this.setupBatchQuery(query, kmers);
         int count = 0;
         for (DbRecord result : query) {
@@ -418,7 +421,7 @@ public class SqlHammerDb extends HammerDb {
     @Override
     public Map<String, Source> findGenomeHammers(String genomeId) {
         // Set up the output hash.
-        Map<String, Source> retVal = new HashMap<String, Source>();
+        Map<String, Source> retVal = new HashMap<>();
         // Create a query to look for all hammers with a matching feature ID.
         try (DbQuery query = new DbQuery(this.db, "Hammer")) {
             query.select("Hammer", "fid", "roleId", "hammer", "strength");

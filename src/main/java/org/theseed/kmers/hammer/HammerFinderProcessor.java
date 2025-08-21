@@ -80,7 +80,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerFinderProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerFinderProcessor.class);
     /** protein finder */
     private ProteinFinder finder;
     /** map of repgen genomes to neighbor sets */

@@ -6,9 +6,6 @@ package org.theseed.binning;
 import java.io.File;
 import java.io.IOException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * This is the base class for taxonomy computation methods.  The basic task is to
  * take in a contigs FASTA file and spit out a taxonomic ID and name.
@@ -19,8 +16,6 @@ import org.slf4j.LoggerFactory;
 public abstract class TaxonomyComputer {
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(TaxonomyComputer.class);
     /** dummy to return when the taxonomic class cannot be computed */
     public static final Result UNKNOWN_TAXON = new Result("6666666", "Unknown Prokaryote");
     /** dummy to use for empty bins */
@@ -32,9 +27,9 @@ public abstract class TaxonomyComputer {
     public static class Result {
 
         /** taxonomic ID */
-        private String id;
+        private final String id;
         /** scientific name */
-        private String name;
+        private final String name;
 
         /**
          * Construct a new taxonomic result object.

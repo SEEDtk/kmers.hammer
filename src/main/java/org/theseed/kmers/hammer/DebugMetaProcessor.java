@@ -48,7 +48,7 @@ public class DebugMetaProcessor extends BasePipeProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(DebugMetaProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(DebugMetaProcessor.class);
     /** index of hammer-fid column */
     private int fidIdx;
     /** index of rep-id column */

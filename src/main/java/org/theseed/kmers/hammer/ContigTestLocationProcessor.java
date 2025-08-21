@@ -55,7 +55,7 @@ public class ContigTestLocationProcessor extends BasePipeProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(ContigTestLocationProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(ContigTestLocationProcessor.class);
     /** test genome source */
     private GenomeSource testGenomes;
     /** representative genome source */

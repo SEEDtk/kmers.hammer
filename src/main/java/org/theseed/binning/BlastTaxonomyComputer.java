@@ -9,8 +9,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.sequence.DnaInputStream;
 import org.theseed.sequence.blast.BlastDB;
 import org.theseed.sequence.blast.BlastHit;
@@ -28,8 +26,6 @@ import org.theseed.sequence.blast.DnaBlastDB;
 public class BlastTaxonomyComputer extends TaxonomyComputer {
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(BlastTaxonomyComputer.class);
     /** seed protein blast database */
     private BlastDB seedDb;
     /** BLAST parameters to use */
@@ -57,13 +53,9 @@ public class BlastTaxonomyComputer extends TaxonomyComputer {
         List<BlastHit> results = this.seedDb.blast(fileStream, this.parms);
         Result retVal;
         switch (results.size()) {
-        case 0:
-            retVal = TaxonomyComputer.UNKNOWN_TAXON;
-            break;
-        case 1:
-            retVal = BlastTaxonomyComputer.getResult(results.get(0));
-            break;
-        default:
+        case 0 -> retVal = TaxonomyComputer.UNKNOWN_TAXON;
+        case 1 -> retVal = BlastTaxonomyComputer.getResult(results.get(0));
+        default -> {
             // Here we must pick the best result.
             BlastHit best = results.get(0);
             int bestScore = best.getNumIdentical();
@@ -76,6 +68,7 @@ public class BlastTaxonomyComputer extends TaxonomyComputer {
                 }
             }
             retVal = BlastTaxonomyComputer.getResult(best);
+            }
         }
         return retVal;
     }

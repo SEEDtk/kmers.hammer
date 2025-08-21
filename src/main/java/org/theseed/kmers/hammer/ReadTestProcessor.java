@@ -63,7 +63,7 @@ public class ReadTestProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(ReadTestProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(ReadTestProcessor.class);
     /** map of sample IDs to black list sets */
     private Map<String, Set<String>> blackListMap;
     /** hash size for sequence batches */

@@ -13,8 +13,6 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.proteins.hammer.SummaryMap.Count;
 
 /**
@@ -28,12 +26,10 @@ import org.theseed.proteins.hammer.SummaryMap.Count;
 public class CompareSampReportEvalReporter extends DetailBaseSampReportEvalReporter {
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(CompareSampReportEvalReporter.class);
     /** hit summary map; sample -> genome -> summary object */
-    private Map<String, Map<String, HitSummary>> summaryMap;
+    private final Map<String, Map<String, HitSummary>> summaryMap;
     /** list of report names */
-    private SortedSet<String> reportNames;
+    private final SortedSet<String> reportNames;
 
     /**
      * This class contains the output data for each repgen/sample pairing.
@@ -41,15 +37,15 @@ public class CompareSampReportEvalReporter extends DetailBaseSampReportEvalRepor
     protected class HitSummary implements Comparable<HitSummary> {
 
         /** sample ID */
-        private String sampleId;
+        private final String sampleId;
         /** sample genome ID */
-        private String sampleGenomeId;
+        private final String sampleGenomeId;
         /** repgen ID */
-        private String repId;
+        private final String repId;
         /** distance */
-        private double distance;
+        private final double distance;
         /** map of report names to hit percents */
-        private TreeMap<String, Double> pctMap;
+        private final TreeMap<String, Double> pctMap;
 
         /**
          * Create a new hit-summary object.
@@ -64,7 +60,7 @@ public class CompareSampReportEvalReporter extends DetailBaseSampReportEvalRepor
             this.sampleGenomeId = genome;
             this.repId = rep;
             this.distance = dist;
-            this.pctMap = new TreeMap<String, Double>();
+            this.pctMap = new TreeMap<>();
         }
 
         /**
@@ -141,8 +137,8 @@ public class CompareSampReportEvalReporter extends DetailBaseSampReportEvalRepor
      */
     public CompareSampReportEvalReporter(IParms processor, PrintWriter writer) {
         super(processor, writer);
-        this.reportNames = new TreeSet<String>();
-        this.summaryMap = new TreeMap<String, Map<String, HitSummary>>();
+        this.reportNames = new TreeSet<>();
+        this.summaryMap = new TreeMap<>();
     }
 
     @Override

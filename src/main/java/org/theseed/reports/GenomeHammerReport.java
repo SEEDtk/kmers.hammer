@@ -7,8 +7,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Feature;
 import org.theseed.genome.Genome;
@@ -22,11 +20,6 @@ import org.theseed.proteins.hammer.HammerDb.Source;
  *
  */
 public class GenomeHammerReport extends HammerReport {
-
-    // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(GenomeHammerReport.class);
-
 
     public GenomeHammerReport(IParms processor) throws ParseFailureException, IOException {
         super(processor);
@@ -47,16 +40,19 @@ public class GenomeHammerReport extends HammerReport {
             String fid = hammerEntry.getValue().getFid();
             Feature feat = repGenome.getFeature(fid);
             String roleId;
-            if (feat == null)
+            String function;
+            if (feat == null) {
                 roleId = "(null)";
-            else {
+                function = "hypothetical protein";
+            } else {
+                function = feat.getPegFunction();
                 var roles = this.getFeatureRoles(feat);
                 if (roles.size() < 1)
                     roleId = "";
                 else
                     roleId = roles.stream().map(x -> x.getId()).collect(Collectors.joining(", "));
             }
-            this.printFields(hammerEntry.getKey(), fid, repId, repName, roleId, feat.getPegFunction());
+            this.printFields(hammerEntry.getKey(), fid, repId, repName, roleId, function);
         }
     }
 

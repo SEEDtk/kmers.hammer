@@ -24,7 +24,7 @@ import org.theseed.sequence.DnaKmers;
 class HammerFactoryTest {
 
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerFactoryTest.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerFactoryTest.class);
 
     @Test
     void testHammerFactory() throws IOException {

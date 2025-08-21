@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 class TestSequenceManager {
 
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(TestSequenceManager.class);
+    private static final Logger log = LoggerFactory.getLogger(TestSequenceManager.class);
 
 
     @Test

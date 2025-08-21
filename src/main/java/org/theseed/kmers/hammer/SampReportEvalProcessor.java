@@ -65,7 +65,7 @@ public class SampReportEvalProcessor extends BaseMultiReportProcessor implements
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(SampReportEvalProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(SampReportEvalProcessor.class);
     /** input column index for sample ID */
     private int sampleIdIdx;
     /** input column index for genome ID */

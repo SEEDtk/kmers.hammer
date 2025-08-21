@@ -50,7 +50,7 @@ public abstract class HammerDb {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerDb.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerDb.class);
     /** kmer size to use */
     private int kmerSize;
     /** number of quality rejections */

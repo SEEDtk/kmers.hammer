@@ -37,7 +37,7 @@ public class HammerCompareReportProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerCompareReportProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerCompareReportProcessor.class);
 
     // COMMAND-LINE OPTIONS
 

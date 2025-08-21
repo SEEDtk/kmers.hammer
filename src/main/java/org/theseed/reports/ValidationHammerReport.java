@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.genome.Genome;
 import org.theseed.proteins.hammer.HammerDb;
@@ -24,6 +26,10 @@ import org.theseed.sequence.Sequence;
  *
  */
 public class ValidationHammerReport extends HammerReport {
+
+    // FIELDS
+    /** logging facility */
+    private static final Logger log = LoggerFactory.getLogger(ValidationHammerReport.class);
 
     /**
      * Create a new hammer validation report.

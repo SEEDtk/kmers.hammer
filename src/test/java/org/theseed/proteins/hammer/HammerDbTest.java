@@ -39,7 +39,7 @@ import org.theseed.sequence.fastq.SeqRead;
 class HammerDbTest {
 
     private static final File LOAD_FILE = new File("data", "hammers200.tbl");
-    protected static Logger log = LoggerFactory.getLogger(HammerDbTest.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerDbTest.class);
 
 
     @Test

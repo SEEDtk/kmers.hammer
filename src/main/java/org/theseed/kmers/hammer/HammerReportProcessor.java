@@ -50,7 +50,7 @@ public class HammerReportProcessor extends BaseHammerUsageProcessor implements H
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerReportProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerReportProcessor.class);
     /** report writer */
     private HammerReport reportWriter;
     /** map of representative genome IDs to names */

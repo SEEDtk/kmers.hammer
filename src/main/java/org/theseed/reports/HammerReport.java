@@ -31,7 +31,7 @@ public abstract class HammerReport {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerReport.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerReport.class);
     /** output print writer */
     private PrintWriter writer;
     /** representative-genome source (if any) */

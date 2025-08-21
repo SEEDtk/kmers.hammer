@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * This sequence manager reads all the sequences at the beginning and loads them into memory.  They
  * are then served by list iterators.
@@ -19,8 +22,10 @@ import java.util.List;
 public class CacheSequenceManager extends SequenceManager {
 
     // FIELDS
+    /** logging facility */
+    private static final Logger log = LoggerFactory.getLogger(CacheSequenceManager.class);
     /** list of sequences read */
-    private List<Sequence> seqs;
+    private final List<Sequence> seqs;
 
     /**
      * This is the class to create an iterator.  Since there is no open file, it's pretty simple.
@@ -28,7 +33,7 @@ public class CacheSequenceManager extends SequenceManager {
     protected class Iter extends SequenceManager.ResourceIter {
 
         /** iterator through the list */
-        private Iterator<Sequence> iter;
+        private final Iterator<Sequence> iter;
 
         /**
          * Construct the iterator.  We simply pass through an iterator on the sequence list.
@@ -66,7 +71,7 @@ public class CacheSequenceManager extends SequenceManager {
         // Create the list.  We estimate the list size using mean contig lengths, which will be grossly low for
         // feature sequences, but will still reduce the number of attempts to grow the list.
         int estimatedSize = (int) (file.length() / 8000);
-        this.seqs = new ArrayList<Sequence>(estimatedSize);
+        this.seqs = new ArrayList<>(estimatedSize);
         log.info("Reading FASTA file {} into cache.", file);
         long len = 0;
         int count = 0;

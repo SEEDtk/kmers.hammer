@@ -5,9 +5,6 @@ package org.theseed.proteins.hammer;
 
 import java.util.Collection;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * This object implements a strategy for classifying samples using hammers.  The main engine takes as input
  * a sequence and a list of hits, then returns a weight map for the sequence.  The weight map could indicate
@@ -20,12 +17,10 @@ import org.slf4j.LoggerFactory;
 public abstract class ClassStrategy {
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(ClassStrategy.class);
     /** TRUE if the counts should be scaled, else FALSE */
-    private boolean scaled;
+    private final boolean scaled;
     /** counting method to use */
-    private HammerDb.Method method;
+    private final HammerDb.Method method;
     /** scale factor for weighting, based on the typical read length */
     protected static final double SCALE_FACTOR = 180.0;
 

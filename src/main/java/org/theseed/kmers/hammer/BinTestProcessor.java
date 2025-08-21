@@ -72,7 +72,7 @@ public class BinTestProcessor extends BaseReportProcessor implements IParms {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(BinTestProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(BinTestProcessor.class);
     /** binning rule to use */
     private HammerBinningRule rule;
     /** map of bin IDs to domains */

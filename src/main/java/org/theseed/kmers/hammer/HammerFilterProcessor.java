@@ -55,7 +55,7 @@ public class HammerFilterProcessor extends BaseHammerUsageProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(HammerFilterProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(HammerFilterProcessor.class);
     /** set of hammers to filter out */
     private Set<String> badHammerSet;
     /** FASTA files to process */

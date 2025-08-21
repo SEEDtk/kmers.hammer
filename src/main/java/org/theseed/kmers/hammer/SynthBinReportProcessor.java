@@ -45,7 +45,7 @@ public class SynthBinReportProcessor extends BaseReportProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(SynthBinReportProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(SynthBinReportProcessor.class);
     /** array of FASTA files to read */
     private File[] inFiles;
     /** map of repgen IDs to names */

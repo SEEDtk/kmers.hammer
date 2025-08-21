@@ -33,7 +33,7 @@ public class GenomeHammerFactory {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(GenomeHammerFactory.class);
+    private static final Logger log = LoggerFactory.getLogger(GenomeHammerFactory.class);
     /** map of kmers to feature IDs; an ambiguous kmer is mapped to an empty string */
     private ConcurrentMap<String, String> kmerMap;
     /** ID of the genome containing the hammers */

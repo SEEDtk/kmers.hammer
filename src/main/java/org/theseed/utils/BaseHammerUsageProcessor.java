@@ -48,7 +48,7 @@ public abstract class BaseHammerUsageProcessor extends BaseReportProcessor imple
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(FindClosestProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(FindClosestProcessor.class);
     /** hammer database */
     private HammerDb hammers;
 

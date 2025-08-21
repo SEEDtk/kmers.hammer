@@ -63,7 +63,7 @@ public class ContigTestStatisticsProcessor extends BasePipeProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(ContigTestStatisticsProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(ContigTestStatisticsProcessor.class);
     /** map of reference-genome IDs to neighbor counts */
     private CountMap<String> neighborhoodCounts;
     /** map of test genome IDs to match statistics */

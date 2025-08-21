@@ -18,8 +18,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.theseed.genome.Genome;
 
 /**
@@ -39,7 +37,7 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
     public class Splitter implements Spliterator<Member> {
 
         /** array of files */
-        private File[] files;
+        private final File[] files;
         /** current position of this splitter */
         private int pos;
         /** limit of this splitter */
@@ -73,7 +71,7 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
 
         @Override
         public Spliterator<Member> trySplit() {
-            Spliterator<Member> retVal = null;
+            Spliterator<Member> retVal;
             // Attempt to split off a section from this spliterator.
             int splitPosition = (this.pos + this.fence) / 2;
             // Here we are too small to split.
@@ -102,8 +100,6 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
     }
 
     // FIELDS
-    /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(SequenceDirectory.class);
     /** array of sequence files in the directory */
     private final File[] files;
     /** pattern for extracting genome IDs from FASTA labels and comments */
@@ -121,12 +117,7 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
             String extension = StringUtils.substringAfterLast(name, ".");
             boolean retVal = false;
             switch (extension) {
-            case "gto" :
-            case "fna" :
-            case "ffn" :
-            case "fa" :
-            case "fasta" :
-                retVal = true;
+            case "gto", "fna", "ffn", "fa", "fasta" -> retVal = true;
             }
             return retVal;
         }
@@ -139,11 +130,11 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
     public static class Member {
 
         /** ID of the member (intended to be a genome ID) */
-        private String id;
+        private final String id;
         /** name of the member (intended to be a genome or file name) */
-        private String name;
+        private final String name;
         /** sequences in the file */
-        private List<Sequence> sequences;
+        private final List<Sequence> sequences;
         /**
          * Construct a new directory member.
          *
@@ -283,6 +274,7 @@ public class SequenceDirectory implements Iterable<SequenceDirectory.Member> {
      *
      * @return a spliterator for this directory
      */
+    @Override
     public Spliterator<Member> spliterator() {
         return new Splitter(this.files, 0, this.files.length);
     }

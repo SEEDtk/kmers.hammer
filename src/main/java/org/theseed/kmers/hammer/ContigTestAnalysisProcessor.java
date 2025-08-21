@@ -56,7 +56,7 @@ public class ContigTestAnalysisProcessor extends BasePipeProcessor {
 
     // FIELDS
     /** logging facility */
-    protected static Logger log = LoggerFactory.getLogger(ContigTestAnalysisProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(ContigTestAnalysisProcessor.class);
     /** index (0-based) of input column containing hit location */
     private int locationColIdx;
     /** index (0-based) of input column containing hammer ID */

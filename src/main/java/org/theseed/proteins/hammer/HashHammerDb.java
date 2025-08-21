@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.theseed.basic.ParseFailureException;
 import org.theseed.sequence.ISequence;
 import org.theseed.sequence.KmerSeries;
@@ -32,10 +34,12 @@ import org.theseed.sequence.Sequence;
 public class HashHammerDb extends HammerDb {
 
     // FIELDS
+    /** logging facility */
+    private static final Logger log = LoggerFactory.getLogger(HashHammerDb.class);
     /** map of hammers to hammer source data */
     private HammerMap<Source> hammerMap;
     /** name of hammer load file */
-    private File dbFile;
+    private final File dbFile;
     /** map of genome IDs to hammer lists */
     private Map<String, HammerArray> genomeMap;
     /** maximum hash size */
@@ -81,9 +85,9 @@ public class HashHammerDb extends HammerDb {
             if (kSize == 0)
                 throw new IllegalStateException("Cannot create hash hammer map with unknown kmer size.");
             // Create the main hammer map.
-            HashHammerDb.this.hammerMap = new HammerMap<Source>(kSize);
+            HashHammerDb.this.hammerMap = new HammerMap<>(kSize);
             // Finally, create the genome map.
-            HashHammerDb.this.genomeMap = new HashMap<String, HammerArray>();
+            HashHammerDb.this.genomeMap = new HashMap<>();
         }
 
         @Override
@@ -169,7 +173,7 @@ public class HashHammerDb extends HammerDb {
 
     @Override
     public Map<String, Source> findGenomeHammers(String genomeId) {
-        Map<String, Source> retVal = new HashMap<String, Source>();
+        Map<String, Source> retVal = new HashMap<>();
         // We keep a list of all the hammers for each genome.  We just need to find it.
         HammerArray hammers = this.genomeMap.get(genomeId);
         if (hammers != null) {
