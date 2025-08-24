@@ -80,105 +80,39 @@ public class App
         String[] newArgs = Arrays.copyOfRange(args, 1, args.length);
         BaseProcessor processor;
         switch (command) {
-        case "hammers" :
-            processor = new HammerProcessor();
-            break;
-        case "hammersF" :
-            processor = new HammerFinderProcessor();
-            break;
-        case "closest" :
-            processor = new FindClosestProcessor();
-            break;
-        case "define" :
-            processor = new HammerDefineProcessor();
-            break;
-        case "contigs" :
-            processor = new HammerFastaProcessor();
-            break;
-        case "dbLoad" :
-            processor = new HammerDbLoadProcessor();
-            break;
-        case "binTest" :
-            processor = new BinTestProcessor();
-            break;
-        case "contigTest" :
-            processor = new ContigTestProcessor();
-            break;
-        case "readTest" :
-            processor = new ReadTestProcessor();
-            break;
-        case "scanTest" :
-            processor = new ContigTestAnalysisProcessor();
-            break;
-        case "scanLocs" :
-            processor = new ContigTestLocationProcessor();
-            break;
-        case "testStats" :
-            processor = new ContigTestStatisticsProcessor();
-            break;
-        case "sampReport" :
-            processor = new SampleBinReportProcessor();
-            break;
-        case "pseudoBins" :
-            processor = new PseudoBinReportProcessor();
-            break;
-        case "krakenBins" :
-            processor = new KrakenBinReportProcessor();
-            break;
-        case "synthBins" :
-            processor = new SynthBinReportProcessor();
-            break;
-        case "binComp" :
-            processor = new BinReportCompareProcessor();
-            break;
-        case "filter" :
-            processor = new HammerFilterProcessor();
-            break;
-        case "report" :
-            processor = new HammerReportProcessor();
-            break;
-        case "hammerStats" :
-            processor = new HammerStatsProcessor();
-            break;
-        case "debugMeta" :
-            processor = new DebugMetaProcessor();
-            break;
-        case "sourMap" :
-            processor = new HammerSourMapProcessor();
-            break;
-        case "gtoReport" :
-            processor = new GtoHammerReportProcessor();
-            break;
-        case "hCompare" :
-            processor = new HammerCompareReportProcessor();
-            break;
-        case "sampEval" :
-            processor = new SampReportEvalProcessor();
-            break;
-        case "roleWeights" :
-            processor = new RoleWeightProcessor();
-            break;
-        case "hitStats" :
-            processor = new HitStatsProcessor();
-            break;
-        case "badCheck" :
-            processor = new BadCheckProcessor();
-            break;
-        case "distCheck" :
-        	processor = new HammerDnaDistCompareProcessor();
-        	break;
-        case "massDistCheck" :
-        	processor = new MassHammerDnaDistCompareProcessor();
-        	break;
-        case "readCheck" :
-            processor = new GtoToReadCheckProcessor();
-            break;
-        case "-h" :
-        case "--help" :
-            processor = null;
-            break;
-        default :
-            throw new RuntimeException("Invalid command " + command + ".");
+        case "hammers" -> processor = new HammerProcessor();
+        case "hammersF" -> processor = new HammerFinderProcessor();
+        case "closest" -> processor = new FindClosestProcessor();
+        case "define" -> processor = new HammerDefineProcessor();
+        case "contigs" -> processor = new HammerFastaProcessor();
+        case "dbLoad" -> processor = new HammerDbLoadProcessor();
+        case "binTest" -> processor = new BinTestProcessor();
+        case "contigTest" -> processor = new ContigTestProcessor();
+        case "readTest" -> processor = new ReadTestProcessor();
+        case "scanTest" -> processor = new ContigTestAnalysisProcessor();
+        case "scanLocs" -> processor = new ContigTestLocationProcessor();
+        case "testStats" -> processor = new ContigTestStatisticsProcessor();
+        case "sampReport" -> processor = new SampleBinReportProcessor();
+        case "pseudoBins" -> processor = new PseudoBinReportProcessor();
+        case "krakenBins" -> processor = new KrakenBinReportProcessor();
+        case "synthBins" -> processor = new SynthBinReportProcessor();
+        case "binComp" -> processor = new BinReportCompareProcessor();
+        case "filter" -> processor = new HammerFilterProcessor();
+        case "report" -> processor = new HammerReportProcessor();
+        case "hammerStats" -> processor = new HammerStatsProcessor();
+        case "debugMeta" -> processor = new DebugMetaProcessor();
+        case "sourMap" -> processor = new HammerSourMapProcessor();
+        case "gtoReport" -> processor = new GtoHammerReportProcessor();
+        case "hCompare" -> processor = new HammerCompareReportProcessor();
+        case "sampEval" -> processor = new SampReportEvalProcessor();
+        case "roleWeights" -> processor = new RoleWeightProcessor();
+        case "hitStats" -> processor = new HitStatsProcessor();
+        case "badCheck" -> processor = new BadCheckProcessor();
+        case "distCheck" -> processor = new HammerDnaDistCompareProcessor();
+        case "massDistCheck" -> processor = new MassHammerDnaDistCompareProcessor();
+        case "readCheck" -> processor = new GtoToReadCheckProcessor();
+        case "-h", "--help" -> processor = null;
+        default -> throw new RuntimeException("Invalid command " + command + ".");
         }
         if (processor == null)
             BaseProcessor.showCommands(COMMANDS);

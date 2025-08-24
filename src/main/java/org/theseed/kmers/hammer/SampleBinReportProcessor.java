@@ -266,9 +266,9 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         this.badGenomes = 0;
         this.goodGenomes = 0;
         this.goodScores = 0;
-        this.badSamples = new TreeSet<String>();
+        this.badSamples = new TreeSet<>();
         // Get the set of roles.
-        this.roleSet = new ArrayList<String>(this.hammers.getRoles());
+        this.roleSet = new ArrayList<>(this.hammers.getRoles());
         // Write the report header.
         writer.println("sample_id\trepgen_id\trepgen_name\tcount\troles\t" + StringUtils.join(this.roleSet, '\t'));
         // Start by connecting to the sample group.
@@ -322,7 +322,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             // Loop through the resume file, copying report data.
             log.info("Restoring old sample data from {}.", this.resumeFile);
             int lineIn = 0;
-            Set<String> newSamples = new HashSet<String>(samples.size() * 4 / 3 + 1);
+            Set<String> newSamples = new HashSet<>(samples.size() * 4 / 3 + 1);
             for (var line : resumeStream) {
                 String newSample = line.get(0);
                 newSamples.add(newSample);
@@ -405,7 +405,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
                 }
             }
             // Process the residual batch.
-            if (batch.size() > 0) {
+            if (! batch.isEmpty()) {
                 myBatchCount++;
                 ScoreMap scores = this.processBatch(batch, batchCoverage, stats);
                 results.accumulate(scores);
@@ -483,12 +483,12 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
         // current sequence.
         String seqId = "";
         int seqLen = 0;
-        Collection<HammerDb.Hit> hitSet = new ArrayList<HammerDb.Hit>(hits.size());
+        Collection<HammerDb.Hit> hitSet = new ArrayList<>(hits.size());
         for (var hit : hits) {
             String hitSeqId = hit.getLoc().getContigId();
             if (! hitSeqId.contentEquals(seqId)) {
                 // This hit is for a new batch. Process the old one.
-                if (hitSet.size() > 0) {
+                if (! hitSet.isEmpty()) {
                     this.updateMap(coverage, stats, retVal, seqLen, hitSet);
                     hitSet.clear();
                 }
@@ -499,7 +499,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             hitSet.add(hit);
         }
         // Check for a residual batch.
-        if (hitSet.size() > 0) {
+        if (! hitSet.isEmpty()) {
             this.updateMap(coverage, stats, retVal, seqLen, hitSet);
         }
         // Return the accumulated scores.
@@ -542,7 +542,7 @@ public class SampleBinReportProcessor extends BaseHammerUsageProcessor implement
             // We need the total score, the number of roles found, and the output string for the role counts.
             double totalScore = 0.0;
             int roleCount = 0;
-            StringBuffer roleString = new StringBuffer(100);
+            StringBuilder roleString = new StringBuilder(100);
             // Only keep the roles with high enough scores.
             for (String role : this.roleSet) {
                 double scoreVal = roleScores.getCount(role);
