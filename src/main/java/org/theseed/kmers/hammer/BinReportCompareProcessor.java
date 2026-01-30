@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -75,12 +76,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
     /** list index of focus file, or -1 if unfocused */
     private int focusIdx;
     /** file filter for report files in a directory */
-    private FilenameFilter BIN_REPORT_FILTER = new FilenameFilter() {
-        @Override
-        public boolean accept(File dir, String name) {
-            return StringUtils.startsWith(name, "binReport.") && StringUtils.endsWith(name, ".tbl");
-        }
-    };
+    private final FilenameFilter BIN_REPORT_FILTER = (File dir, String name) -> Strings.CS.startsWith(name, "binReport.") && Strings.CS.endsWith(name, ".tbl");
 
     // COMMAND-LINE OPTIONS
 
@@ -117,7 +113,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         if (this.nValueList.size() < 1)
             throw new ParseFailureException("Must be at least one value in N-value list.");
         // Now check all the bin report files.
-        this.reportFiles = new ArrayList<File>();
+        this.reportFiles = new ArrayList<>();
         for (File inFile : this.inFiles) {
             if (inFile.isDirectory()) {
                 // Here we need all the files in the directory.
@@ -171,7 +167,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
         final int nFiles = this.reportFiles.size();
         this.fileContents = this.reportFiles.stream().map(x -> this.readReport(x)).collect(Collectors.toList());
         // Insure each file has the same list of samples.
-        Set<String> samples = new HashSet<String>(this.fileContents.get(0).keySet());
+        Set<String> samples = new HashSet<>(this.fileContents.get(0).keySet());
         for (var fileContent : this.fileContents.subList(1, nFiles)) {
             if (! samples.equals(fileContent.keySet()))
                 samples.addAll(fileContent.keySet());
@@ -246,7 +242,7 @@ public class BinReportCompareProcessor extends BaseReportProcessor {
      */
     private Map<String, WeightMap> readReport(File reportFile) {
         // Create the return map.
-        Map<String, WeightMap> retVal = new HashMap<String, WeightMap>();
+        Map<String, WeightMap> retVal = new HashMap<>();
         // This will count the score lines read.
         int scoreCount = 0;
         // Set up the file.

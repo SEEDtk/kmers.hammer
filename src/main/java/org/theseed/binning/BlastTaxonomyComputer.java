@@ -38,11 +38,13 @@ public class BlastTaxonomyComputer extends TaxonomyComputer {
      */
     public BlastTaxonomyComputer(File seedFastaFile, BlastParms parms) throws IOException {
         // Note we only want the best match for each contig.
-        this.parms = parms.clone().maxPerQuery(1);
         try {
+            this.parms = parms.clone().maxPerQuery(1);
             this.seedDb = DnaBlastDB.createOrLoad(seedFastaFile, 11);
         } catch (InterruptedException e) {
             throw new IOException("Error creating BLAST database: " + e.toString());
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
         }
     }
 
