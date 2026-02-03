@@ -228,13 +228,13 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         int genomeColIdx = inputStream.findField("genome_id");
         int repColIdx = inputStream.findField("rep_id");
         log.info("Scanning repgen list file.");
-        this.neighborMap = new HashMap<String, Set<String>>(1000);
+        this.neighborMap = new HashMap<>(1000);
         this.genomeCount = 0;
         // Connect each genome to its representative.
         for (var line : inputStream) {
             String genomeId = line.get(genomeColIdx);
             String repId = line.get(repColIdx);
-            Set<String> neighborSet = this.neighborMap.computeIfAbsent(repId, x -> new HashSet<String>());
+            Set<String> neighborSet = this.neighborMap.computeIfAbsent(repId, x -> new HashSet<>());
             neighborSet.add(genomeId);
             this.genomeCount++;
         }
@@ -260,7 +260,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         this.conflictCount = 0;
         this.kmerCount = 0;
         // Create the master hammer map.
-        this.hammerMap = new HammerMap<HammerScore>(this.kmerSize);
+        this.hammerMap = new HammerMap<>(this.kmerSize);
         // Now we are ready to begin.  For each role, we load all the sequences into memory, grouped
         // by representative genome, and put the good ones in the hammer map.
         var fastaFileMap = this.finder.getFastas();
@@ -488,7 +488,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
         Genome repGenome = this.repGenomes.getGenome(repId);
         log.info("Scanning genome {} for cleaning step.", repGenome);
         int retVal = 0;
-        CountMap<String> counts = new CountMap<String>();
+        CountMap<String> counts = new CountMap<>();
         // Scan all the contig sequences in both directions.
         for (Contig contig : repGenome.getContigs()) {
             String seq = contig.getSequence();
@@ -534,7 +534,7 @@ public class HammerFinderProcessor extends BasePipeProcessor implements HammerFe
      * @param seq	group of sequences to scan
      */
     private Set<String> getHammers(Collection<String> seqs) {
-        Set<String> retVal = new HashSet<String>(seqs.size() * 1400);
+        Set<String> retVal = new HashSet<>(seqs.size() * 1400);
         KmerSeries kmers = new KmerSeries(seqs, this.kmerSize);
         for (String kmer : kmers)
             retVal.add(kmer);
