@@ -17,7 +17,7 @@ public abstract class HammerDupFilter {
 
     // FIELDS
     /** empty map to use when returning nothing */
-    private static final Map<String, String> EMPTY_MAP = new TreeMap<String, String>();
+    private static final Map<String, String> EMPTY_MAP = new TreeMap<>();
 
     /**
      * This interface provides access to the parameters that must be provided by
@@ -132,7 +132,7 @@ public abstract class HammerDupFilter {
             if (fidMap.size() <= 1)
                 retVal = fidMap;
             else {
-                retVal = new TreeMap<String, String>();
+                retVal = new TreeMap<>();
                 // Find the longest feature.
                 int len = 0;
                 String fid = null;
